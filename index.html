@@ -1,0 +1,1852 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Switchboard - Logic Simulator</title>
+<style>
+:root{
+  --canvas:#2b2b2b; --panel:#3c3f41; --panel2:#45494a; --hdr:#4b4f51; --line:#262626; --line2:#555a5c;
+  --text:#bbbbbb; --hi:#e8e8e8; --dim:#8a8a8a; --in:#1e1e1e; --sel:#0078d7; --on:#00e676; --bad:#ff3b30; --warn:#ffb300;
+  --ui:"Segoe UI",Tahoma,Geneva,Verdana,sans-serif; --mono:Consolas,Monaco,"Courier New",monospace;
+}
+*{box-sizing:border-box;border-radius:0 !important;box-shadow:none !important}
+html,body{margin:0;height:100%;overflow:hidden;background:var(--panel);color:var(--text);font:12px/1.35 var(--ui);user-select:none;-webkit-user-select:none}
+input,select,textarea{font:12px var(--ui);color:var(--hi);background:var(--in);border:1px solid var(--line2);padding:1px 4px;height:20px;outline:none;user-select:text;-webkit-user-select:text}
+textarea{height:auto;font:11px/1.4 var(--mono);resize:vertical;width:100%;padding:3px 4px}
+input:focus,select:focus,textarea:focus{border-color:var(--sel)}
+input[type=checkbox]{height:auto;accent-color:var(--sel);margin:0 3px 0 0;vertical-align:-2px}
+input[type=color]{padding:0 1px;width:36px;height:18px;background:var(--in)}
+input[type=number]::-webkit-inner-spin-button{opacity:.5}
+.btn{font:12px var(--ui);color:#dddddd;background:#4c5052;border:1px solid #5e6366;padding:1px 10px;height:22px;cursor:default;white-space:nowrap}
+.btn:hover{background:#565a5c;border-color:#6b7072}
+.btn:active{background:#3a3d3f}
+.btn.pri{background:#1f5f9a;border-color:var(--sel);color:#fff}
+.btn.pri:hover{background:#2770b3}
+.btn.danger{color:#ff8a80}
+.btn:disabled{opacity:.45}
+#app{display:flex;flex-direction:column;height:100%}
+#menubar{height:22px;flex:none}#toolbar{height:30px;flex:none}#editbar{flex:none}#status{height:22px;flex:none}
+
+/* ---- menu bar ---- */
+#menubar{display:flex;align-items:stretch;background:var(--panel);border-bottom:1px solid var(--line);padding-left:2px}
+#menubar .mi{padding:0 8px;display:flex;align-items:center;color:#d0d0d0;cursor:default}
+#menubar .mi:hover,#menubar .mi.open{background:var(--sel);color:#fff}
+#menubar .title{margin-left:auto;padding:0 10px;color:var(--dim);display:flex;align-items:center;gap:6px}
+#menubar .title b{color:#cfcfcf;font-weight:600}
+.dd{position:fixed;background:var(--panel);border:1px solid #6a6a6a;padding:2px 0;min-width:240px;z-index:100;display:none}
+.dd.show{display:block}
+.dd .it{display:grid;grid-template-columns:18px 1fr auto;align-items:center;padding:3px 14px 3px 4px;color:#d6d6d6;cursor:default;white-space:nowrap}
+.dd .it .k{color:var(--dim);padding-left:24px;font-size:11px}
+.dd .it:hover{background:var(--sel);color:#fff}.dd .it:hover .k{color:#dce9f7}
+.dd .it.dis{color:#6f6f6f}.dd .it.dis:hover{background:none;color:#6f6f6f}
+.dd .lbl{padding:4px 8px 2px 22px;color:var(--dim);font-size:11px}
+.dd .sep{border-top:1px solid #555;margin:3px 2px}
+
+/* ---- toolbar ---- */
+#toolbar{display:flex;align-items:center;gap:1px;padding:0 4px;background:var(--panel);border-bottom:1px solid var(--line)}
+.tb{width:24px;height:22px;display:grid;place-items:center;background:transparent;border:1px solid transparent;color:#cfcfcf;cursor:default;padding:0;font:13px var(--ui)}
+.tb svg{width:16px;height:16px}
+.tb:hover{background:#4c5052;border-color:#5e6366}
+.tb.on{background:#2d4f73;border-color:var(--sel);color:#fff}
+.tb:disabled{opacity:.35;background:none;border-color:transparent}
+.tsep{width:1px;height:18px;background:#2a2a2a;border-right:1px solid #4e5254;margin:0 5px}
+.tlab{color:var(--dim);margin:0 4px 0 2px}
+#toolbar input[type=number],#toolbar input[type=text]{width:62px;font:11px var(--mono);text-align:right}
+#toolbar label{display:flex;align-items:center;color:#cfcfcf;margin:0 4px}
+
+/* ---- chip edit bar ---- */
+#editbar{display:none;align-items:center;gap:6px;padding:3px 8px;background:#4a4430;border-bottom:1px solid var(--line);color:#f1e3b5}
+#editbar.show{display:flex}
+#editbar b{color:#fff3cc}
+#editbar .sp{flex:1}
+
+/* ---- main split layout ---- */
+#main{flex:1;display:flex;min-height:0;border-bottom:1px solid var(--line)}
+.panel{display:flex;flex-direction:column;background:var(--panel);min-width:0;min-height:0}
+.phead{height:21px;flex:none;display:flex;align-items:center;gap:6px;padding:0 6px;background:var(--panel2);border-bottom:1px solid var(--line);color:#d0d0d0;font-size:11px}
+.phead .sp{flex:1}
+.phead .x{color:var(--dim);cursor:default;padding:0 3px}.phead .x:hover{color:#fff;background:#5a5e60}
+.pbody{flex:1;overflow:auto;min-height:0}
+#palette{width:var(--palW,220px)}
+#inspector{width:var(--insW,280px)}
+.split{flex:none;background:var(--panel);position:relative;z-index:2}
+.split.v{width:4px;cursor:col-resize;border-left:1px solid var(--line);border-right:1px solid var(--line)}
+.split.h{height:4px;cursor:row-resize;border-top:1px solid var(--line);border-bottom:1px solid var(--line)}
+.split:hover,.split.drag{background:var(--sel)}
+.hidden{display:none !important}
+#center{flex:1;display:flex;flex-direction:column;min-width:0;min-height:0}
+#wrap{position:relative;flex:1;min-height:0;overflow:hidden;background:var(--canvas)}
+#cv{position:absolute;inset:0;width:100%;height:100%;display:block;outline:none;touch-action:none}
+#tip{position:absolute;pointer-events:none;background:#1e1e1e;border:1px solid #6a6a6a;padding:2px 6px;font:11px/1.4 var(--mono);color:#e0e0e0;display:none;white-space:pre;z-index:5}
+
+/* ---- component tree ---- */
+#treeSearch{display:block;width:calc(100% - 8px);margin:4px}
+.tree{padding-bottom:12px}
+.tr{display:flex;align-items:center;height:19px;padding-right:6px;cursor:default;white-space:nowrap;color:#cccccc}
+.tr:hover{background:#4b4f51}
+.tr.armed{background:var(--sel);color:#fff}
+.tr.armed .meta{color:#dce9f7}
+.tr .tw{width:14px;flex:none;text-align:center;color:#9a9a9a;font-size:9px}
+.tr .ic{width:16px;height:14px;flex:none;margin-right:5px;color:#a9b7c6;display:grid;place-items:center}
+.tr .ic svg{width:14px;height:14px}
+.tr .nm{overflow:hidden;text-overflow:ellipsis}
+.tr .meta{margin-left:auto;padding-left:8px;color:#7a7a7a;font:11px var(--mono)}
+.tr.grp{color:#dddddd;font-weight:600}
+.tr.grp .nm{font-weight:600}
+.tr.empty{color:#7d7d7d;white-space:normal;height:auto;padding:3px 8px 6px 34px;line-height:1.4}
+.tr.dis{opacity:.4}
+.chipsw{width:10px;height:10px;display:inline-block;border:1px solid #1e1e1e}
+
+/* ---- property grid ---- */
+.objsel{display:flex;align-items:center;gap:6px;height:22px;padding:0 6px;border-bottom:1px solid var(--line);background:var(--in);color:#e0e0e0;font-weight:600}
+.objsel span{color:var(--dim);font:11px var(--mono);font-weight:400}
+table.pg{width:100%;border-collapse:collapse;table-layout:fixed}
+table.pg th,table.pg td{border:1px solid #303233;height:20px;padding:0 5px;font-weight:400;text-align:left;vertical-align:middle;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+table.pg th{width:42%;color:#bdbdbd;background:var(--panel)}
+table.pg td{background:#313335;color:#e2e2e2}
+table.pg td.ro{color:#a8a8a8}
+table.pg td.mono,table.pg .mono{font:11px var(--mono)}
+table.pg td input:not([type=checkbox]):not([type=color]),table.pg td select{width:100%;height:19px;border:1px solid transparent;background:transparent;padding:0 2px;margin:0}
+table.pg td input:hover,table.pg td select:hover{border-color:#4e5254}
+table.pg td input:focus,table.pg td select:focus{background:var(--in);border-color:var(--sel)}
+table.pg td select option{background:#2b2b2b}
+table.pg tr.cat td{background:var(--hdr);color:#e6e6e6;font-weight:600;font-size:11px;padding-left:4px;cursor:default}
+table.pg tr.cat td:before{content:"▾ ";color:#a0a0a0;font-size:9px}
+table.pg tr.cat.col td:before{content:"▸ "}
+table.pg td.full{padding:3px 4px;white-space:normal}
+table.pg td.full textarea{border-color:#4e5254}
+table.pg .tr8{float:right;color:var(--sel);cursor:default;padding:0 2px;font-family:var(--ui)}
+table.pg .tr8:hover{color:#fff;background:var(--sel)}
+.pgbtns{display:flex;flex-wrap:wrap;gap:3px;padding:5px 4px;border-bottom:1px solid #303233}
+.desc{padding:6px 8px;color:#9a9a9a;line-height:1.45;border-top:1px solid #303233;white-space:normal}
+.desc code,.dlg code{font:11px var(--mono);color:#d0d0d0}
+.err{color:#ff8a80;font:11px var(--mono);padding:2px 4px}
+
+/* ---- analyzer ---- */
+#analyzer{height:var(--anH,160px);flex:none}
+#analyzer .phead .btn{height:17px;padding:0 6px;font-size:11px}
+#anBody{position:relative;flex:1;min-height:0;overflow-y:auto;background:#1e1e1e}
+#an{display:block;width:100%}
+#anEmpty{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:#6f6f6f;pointer-events:none;padding:8px;text-align:center}
+
+/* ---- status bar ---- */
+#status{display:flex;align-items:stretch;background:var(--panel);color:#bdbdbd;font:11px var(--ui)}
+#status > div{display:flex;align-items:center;padding:0 8px;border-left:1px solid #2a2a2a;box-shadow:inset 1px 0 #4e5254 !important;white-space:nowrap}
+#status #sbMsg{flex:1;border-left:none;box-shadow:none !important;overflow:hidden;text-overflow:ellipsis;color:#a8a8a8}
+#status #sbMsg.err{background:#5c2522;color:#ffd6d2}
+#status #sbMsg.ok{color:#e6e6e6}
+#status .v{font-family:var(--mono);color:#e2e2e2;margin-left:4px}
+#status .good{color:var(--on)}#status .bad{color:#ff6b60}#status .warn{color:var(--warn)}
+
+/* ---- dialog ---- */
+#dlgWrap{position:fixed;inset:0;background:rgba(0,0,0,.35);display:none;align-items:center;justify-content:center;z-index:200}
+#dlgWrap.show{display:flex}
+.dlg{background:var(--panel);border:1px solid #707070;min-width:360px;max-width:640px;max-height:86vh;display:flex;flex-direction:column}
+.dlg .tt{height:24px;display:flex;align-items:center;padding:0 8px;background:#2d5c8a;color:#fff;font-weight:600}
+.dlg .bd{padding:10px 12px;overflow:auto;line-height:1.5;color:#cfcfcf}
+.dlg .ft{display:flex;justify-content:flex-end;gap:6px;padding:8px 10px;border-top:1px solid #303233}
+.dlg .ft .btn{min-width:76px}
+.dlg table{border-collapse:collapse;width:100%}
+.dlg td{border-bottom:1px solid #353739;padding:2px 6px;vertical-align:top}
+.dlg td:first-child{font:11px var(--mono);color:#e6e6e6;white-space:nowrap;width:1%}
+.dlg h5{margin:10px 0 4px;font-size:12px;color:#e6e6e6}
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="menubar"></div>
+  <div id="toolbar"></div>
+  <div id="editbar"><span>Editing chip:</span><b id="ebName"></b><span class="sp"></span>
+    <button class="btn pri" id="ebSave">Save chip</button><button class="btn" id="ebDone">Save &amp; close</button><button class="btn" id="ebDiscard">Discard changes</button></div>
+  <div id="main">
+    <div class="panel" id="palette"><div class="phead"><span>Components</span><span class="sp"></span><span class="x" data-hide="pal" title="Hide (View menu restores)">✕</span></div><div class="pbody" id="palBody"></div></div>
+    <div class="split v" id="spPal"></div>
+    <div id="center">
+      <div id="wrap"><canvas id="cv" tabindex="0"></canvas><div id="tip"></div></div>
+      <div class="split h" id="spAn"></div>
+      <div class="panel" id="analyzer">
+        <div class="phead"><span>Logic Analyzer</span><span id="anInfo" style="color:var(--dim)"></span><span class="sp"></span>
+          <button class="btn" id="anAdd" title="Trace selected wire/part (T)">Trace selection</button><button class="btn" id="anClear">Clear</button><button class="btn" id="anRm">Remove all</button><span class="x" data-hide="an" title="Hide">✕</span></div>
+        <div id="anBody"><canvas id="an"></canvas><div id="anEmpty">No signals. Select a wire or part and press T to trace it.</div></div>
+      </div>
+    </div>
+    <div class="split v" id="spIns"></div>
+    <div class="panel" id="inspector"><div class="phead"><span>Properties</span><span class="sp"></span><span class="x" data-hide="ins" title="Hide">✕</span></div><div class="pbody" id="insBody"></div></div>
+  </div>
+  <div id="status">
+    <div id="sbMsg"></div>
+    <div>X,Y<span class="v" id="sbXY">0, 0</span></div>
+    <div>Zoom<span class="v" id="sbZoom">100%</span></div>
+    <div>Tick<span class="v" id="sbTick">0</span></div>
+    <div>Ticks/s<span class="v" id="sbTps">0</span></div>
+    <div>FPS<span class="v" id="sbFps">0</span></div>
+    <div id="sbStats"></div>
+    <div id="sbSim"></div>
+  </div>
+</div>
+<div class="dd" id="dd"></div>
+<div id="dlgWrap"><div class="dlg"><div class="tt" id="dlgT"></div><div class="bd" id="dlgB"></div><div class="ft" id="dlgF"></div></div></div>
+<input type="file" id="file" accept=".json,application/json" hidden>
+<script>
+'use strict';
+/* =====================================================================
+   ENGINE — primitives, hierarchical compiler, switch-level simulator
+   ===================================================================== */
+const GRID = 20;
+const M = w => (w >= 32 ? -1 : (1 << w) - 1);
+let _u = 0;
+const uid = p => (p || 'c') + (++_u).toString(36) + Math.random().toString(36).slice(2, 7);
+const clone = o => JSON.parse(JSON.stringify(o));
+const clampW = w => Math.max(1, Math.min(32, (w | 0) || 1));
+const LIB = { chips: {} };
+const SEG_HEX = [0x3F, 0x06, 0x5B, 0x4F, 0x66, 0x6D, 0x7D, 0x07, 0x7F, 0x6F, 0x77, 0x7C, 0x39, 0x5E, 0x79, 0x71];
+const OLED_DW = { mono: 1, gray: 4, rgb: 8 };
+const P = (n, dir, w, x, y, side, label) => ({ n, dir, w: w || 1, x, y, side, label: label == null ? n : label });
+const portW = w => (w <= 1 ? 3 : Math.max(3, Math.ceil(w * 0.6) + 2));
+const log2 = n => Math.round(Math.log2(n));
+
+/* ---------- primitive & peripheral types ---------- */
+const T = {
+  power: { name: 'Power', cat: 'Sources', glyph: '1', hint: 'Constant 1 (HIGH / VCC)',
+    size: () => ({ w: 2, h: 2 }), pins: () => [P('out', 'out', 1, 2, 1, 'R', '')],
+    build(b, c, net) { b.el('CONST', [], [net('out')], { v: 1 }); } },
+  ground: { name: 'Ground', cat: 'Sources', glyph: '0', hint: 'Constant 0 (LOW / GND)',
+    size: () => ({ w: 2, h: 2 }), pins: () => [P('out', 'out', 1, 2, 1, 'R', '')],
+    build(b, c, net) { b.el('CONST', [], [net('out')], { v: 0 }); } },
+  toggle: { name: 'Toggle Switch', cat: 'Sources', glyph: '⏻', hint: 'Click to flip between 0 and 1', def: { value: 0, label: '' },
+    size: () => ({ w: 2, h: 2 }), pins: () => [P('out', 'out', 1, 2, 1, 'R', '')],
+    build(b, c, net) { b.el('SRC', [], [net('out')], { kind: 'toggle', v: c.props.value & 1 }, c.id); } },
+  button: { name: 'Push Button', cat: 'Sources', glyph: '◉', hint: 'Momentary: 1 only while held', def: { label: '' },
+    size: () => ({ w: 2, h: 2 }), pins: () => [P('out', 'out', 1, 2, 1, 'R', '')],
+    build(b, c, net) { b.el('SRC', [], [net('out')], { kind: 'button', v: 0 }, c.id); } },
+  clock: { name: 'Clock', cat: 'Sources', glyph: '⎍', hint: 'Toggles every tick (rate set in toolbar)', def: { label: '' },
+    size: () => ({ w: 3, h: 2 }), pins: () => [P('out', 'out', 1, 3, 1, 'R', '')],
+    build(b, c, net) { b.el('SRC', [], [net('out')], { kind: 'clock', v: 0 }, c.id); } },
+  input: { name: 'Input Port', cat: 'Ports', glyph: '⇥', hint: 'Named chip input. Clickable bits when testing.', def: { name: 'A', width: 1, value: 0 },
+    size: c => ({ w: portW(clampW(c.props.width)), h: 2 }),
+    pins: c => [P('out', 'out', clampW(c.props.width), portW(clampW(c.props.width)), 1, 'R', '')],
+    build(b, c, net, cx) {
+      const w = clampW(c.props.width);
+      if (cx.top) b.el('SRC', [], [net('out')], { kind: 'input', v: (c.props.value | 0) & M(w) }, c.id);
+      else b.port('in', String(c.props.name), w, net('out'), c);
+    } },
+  output: { name: 'Output Port', cat: 'Ports', glyph: '⇤', hint: 'Named chip output', def: { name: 'Y', width: 1 },
+    size: c => ({ w: portW(clampW(c.props.width)), h: 2 }),
+    pins: c => [P('in', 'in', clampW(c.props.width), 0, 1, 'L', '')],
+    build(b, c, net, cx) { if (!cx.top) b.port('out', String(c.props.name), clampW(c.props.width), net('in'), c); } },
+  sw_no: { name: 'NO Switch', cat: 'Switches', glyph: '⊸', hint: 'Normally-open: conducts in→out when ctrl = 1', def: { width: 1 },
+    size: () => ({ w: 2, h: 2 }),
+    pins: c => { const w = clampW(c.props.width); return [P('in', 'in', w, 0, 1, 'L', ''), P('ctrl', 'in', 1, 1, 2, 'B', ''), P('out', 'out', w, 2, 1, 'R', '')]; },
+    build(b, c, net) { b.el('SW', [net('in'), net('ctrl')], [net('out')], { nc: 0 }); } },
+  sw_nc: { name: 'NC Switch', cat: 'Switches', glyph: '⊷', hint: 'Normally-closed: conducts in→out when ctrl = 0', def: { width: 1 },
+    size: () => ({ w: 2, h: 2 }),
+    pins: c => { const w = clampW(c.props.width); return [P('in', 'in', w, 0, 1, 'L', ''), P('ctrl', 'in', 1, 1, 2, 'B', ''), P('out', 'out', w, 2, 1, 'R', '')]; },
+    build(b, c, net) { b.el('SW', [net('in'), net('ctrl')], [net('out')], { nc: 1 }); } },
+  split: { name: 'Bus Splitter', cat: 'Wiring', glyph: '⋔', hint: 'Bus → individual bits (b0 = LSB)', def: { width: 4 },
+    size: c => ({ w: 2, h: clampW(c.props.width) + 1 }),
+    pins: c => { const n = clampW(c.props.width); const r = [P('in', 'in', n, 0, 1, 'L', '')]; for (let i = 0; i < n; i++) r.push(P('b' + i, 'out', 1, 2, i + 1, 'R', '' + i)); return r; },
+    build(b, c, net) { const n = clampW(c.props.width), o = []; for (let i = 0; i < n; i++) o.push(net('b' + i)); b.el('SPLIT', [net('in')], o, {}); } },
+  merge: { name: 'Bus Merger', cat: 'Wiring', glyph: '⋲', hint: 'Individual bits → bus (b0 = LSB)', def: { width: 4 },
+    size: c => ({ w: 2, h: clampW(c.props.width) + 1 }),
+    pins: c => { const n = clampW(c.props.width); const r = []; for (let i = 0; i < n; i++) r.push(P('b' + i, 'in', 1, 0, i + 1, 'L', '' + i)); r.push(P('out', 'out', n, 2, 1, 'R', '')); return r; },
+    build(b, c, net) { const n = clampW(c.props.width), ii = []; for (let i = 0; i < n; i++) ii.push(net('b' + i)); b.el('MERGE', ii, [net('out')], {}); } },
+  led: { name: 'LED', cat: 'Displays', glyph: '●', hint: 'Single-bit light', def: { color: '#ff4d4d', label: '' },
+    size: () => ({ w: 2, h: 2 }), pins: () => [P('in', 'in', 1, 0, 1, 'L', '')] },
+  busread: { name: 'Bus Readout', cat: 'Displays', glyph: '▦', hint: 'LED bar + binary / decimal / hex', def: { width: 8, label: '' },
+    size: c => ({ w: Math.max(5, Math.ceil(clampW(c.props.width) * 0.55) + 2), h: 3 }),
+    pins: c => [P('in', 'in', clampW(c.props.width), 0, 1, 'L', '')] },
+  seg7: { name: '7-Segment', cat: 'Displays', glyph: '8', hint: 'Hex digit (4-bit) or raw a–g segments', def: { mode: 'hex', color: '#ff3b3b' },
+    size: c => (c.props.mode === 'seg' ? { w: 5, h: 9 } : { w: 4, h: 6 }),
+    pins: c => (c.props.mode === 'seg'
+      ? ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'dp'].map((n, i) => P(n, 'in', 1, 0, i + 1, 'L'))
+      : [P('v', 'in', 4, 0, 1, 'L', 'V'), P('dp', 'in', 1, 0, 2, 'L', 'dp')]),
+    build(b, c, net) { /* sink: read at draw time */ } },
+  oled: { name: 'OLED Display', cat: 'Displays', glyph: '▣', hint: 'Pixel screen: X, Y, D, WE, CLK, CLR', def: { res: 32, color: 'mono' },
+    size: () => ({ w: 9, h: 8 }),
+    pins: c => { const ab = log2(c.props.res | 0 || 32), dw = OLED_DW[c.props.color] || 1;
+      return [P('x', 'in', ab, 0, 1, 'L', 'X'), P('y', 'in', ab, 0, 2, 'L', 'Y'), P('d', 'in', dw, 0, 3, 'L', 'D'), P('we', 'in', 1, 0, 4, 'L', 'WE'), P('clk', 'in', 1, 0, 5, 'L', 'CLK'), P('clr', 'in', 1, 0, 6, 'L', 'CLR')]; },
+    build(b, c, net) { b.el('OLED', ['x', 'y', 'd', 'we', 'clk', 'clr'].map(n => net(n)), [], { res: c.props.res | 0 || 32, color: c.props.color }, c.id); } },
+  rom: { name: 'ROM', cat: 'Memory', glyph: '⛁', hint: 'Programmable read-only memory', def: { addrBits: 4, dataBits: 8, data: [], src: '' },
+    size: () => ({ w: 5, h: 3 }),
+    pins: c => [P('a', 'in', Math.min(16, clampW(c.props.addrBits)), 0, 1, 'L', 'A'), P('d', 'out', clampW(c.props.dataBits), 5, 1, 'R', 'D')],
+    build(b, c, net) { b.el('ROM', [net('a')], [net('d')], { data: c.props.data || [] }); } },
+  ram: { name: 'RAM', cat: 'Memory', glyph: '⛃', hint: 'Read/write memory, writes on rising CLK when WE', def: { addrBits: 4, dataBits: 8 },
+    size: () => ({ w: 5, h: 5 }),
+    pins: c => [P('a', 'in', Math.min(16, clampW(c.props.addrBits)), 0, 1, 'L', 'A'), P('din', 'in', clampW(c.props.dataBits), 0, 2, 'L', 'Din'), P('we', 'in', 1, 0, 3, 'L', 'WE'), P('clk', 'in', 1, 0, 4, 'L', 'CLK'), P('d', 'out', clampW(c.props.dataBits), 5, 1, 'R', 'D')],
+    build(b, c, net) { b.el('RAM', ['a', 'din', 'we', 'clk'].map(n => net(n)), [net('d')], { ab: Math.min(16, clampW(c.props.addrBits)) }, c.id); } },
+  note: { name: 'Text Note', cat: 'Wiring', glyph: '✎', hint: 'Annotation label', def: { text: 'Note' },
+    size: c => { const L = String(c.props.text || '').split('\n'); const m = Math.max(3, ...L.map(l => l.length)); return { w: Math.max(2, Math.ceil((m * 6.6 + 8) / GRID)), h: Math.max(1, Math.ceil((L.length * 15 + 6) / GRID)) }; },
+    pins: () => [] },
+  chip: { name: 'Chip', cat: 'Library',
+    size: c => { const i = chipInfo(c.props.chipId); return i ? i.size : { w: 4, h: 2 }; },
+    pins: c => { const i = chipInfo(c.props.chipId); return i ? i.pins : []; },
+    build(b, c, net, cx) {
+      const d = LIB.chips[c.props.chipId]; if (!d) return;
+      if (cx.chain.includes(d.id)) { cx.errors.push('Recursive chip: ' + d.circuit.meta.name); return; }
+      const info = chipInfo(d.id), tpl = getTpl(d, cx);
+      const off = b.inst(tpl);
+      info.ins.forEach((p, i) => { const tp = tpl.ports.in[i], pn = net(info.pins[i].n); if (tp && pn !== undefined && tp.w === p.w) b.union(pn, tp.net + off); });
+      info.outs.forEach((p, i) => { const tp = tpl.ports.out[i], pn = net(info.pins[info.ins.length + i].n); if (tp && pn !== undefined && tp.w === p.w) b.union(pn, tp.net + off); });
+    } },
+};
+
+/* ---------- chip geometry (derived from the chip's ports) ---------- */
+const CG = new Map(), TPL = new Map();
+function invalidate() { CG.clear(); TPL.clear(); }
+function portsOf(circ) {
+  const srt = (a, b) => a.y - b.y || a.x - b.x;
+  const seen = new Set(), uniq = n => { let k = n, i = 2; while (seen.has(k)) k = n + '_' + i++; seen.add(k); return k; };
+  const ins = circ.components.filter(c => c.type === 'input').sort(srt).map(c => ({ n: uniq(String(c.props.name || 'in')), w: clampW(c.props.width) }));
+  const outs = circ.components.filter(c => c.type === 'output').sort(srt).map(c => ({ n: uniq(String(c.props.name || 'out')), w: clampW(c.props.width) }));
+  return { ins, outs };
+}
+function chipInfo(id) {
+  const d = LIB.chips[id]; if (!d) return null;
+  const e = CG.get(id); if (e && e.d === d && e.ver === d.version) return e;
+  const { ins, outs } = portsOf(d.circuit);
+  const name = d.circuit.meta.name || 'Chip';
+  const mL = Math.max(0, ...ins.map(p => p.n.length)), mR = Math.max(0, ...outs.map(p => p.n.length));
+  const icon = d.circuit.meta.icon ? d.circuit.meta.icon.length + 1 : 0;
+  const w = Math.max(3, Math.ceil(((mL + mR) * 6.2 + 18) / GRID), Math.ceil(((name.length + icon) * 6.8 + 18) / GRID));
+  const h = Math.max(2, Math.max(ins.length, outs.length) + 1);
+  const pins = [...ins.map((p, i) => P(p.n, 'in', p.w, 0, i + 1, 'L')), ...outs.map((p, i) => P(p.n, 'out', p.w, w, i + 1, 'R'))];
+  const r = { d, ver: d.version, size: { w, h }, pins, ins, outs, name };
+  CG.set(id, r); return r;
+}
+function chipDeps(id, acc) {
+  acc = acc || new Set(); const d = LIB.chips[id]; if (!d) return acc;
+  for (const c of d.circuit.components) if (c.type === 'chip' && !acc.has(c.props.chipId)) { acc.add(c.props.chipId); chipDeps(c.props.chipId, acc); }
+  return acc;
+}
+function circDeps(circ) { const s = new Set(); for (const c of circ.components) if (c.type === 'chip') { s.add(c.props.chipId); chipDeps(c.props.chipId, s); } return s; }
+
+/* ---------- geometry transforms (rotation 0-3 = 90° cw steps, flip = mirror horizontally first) ---------- */
+function xf(c, sz, lx, ly) {
+  let x = lx, y = ly; const w = sz.w, h = sz.h;
+  if (c.flip) x = w - x;
+  switch (c.rot & 3) { case 1: [x, y] = [h - y, x]; break; case 2: [x, y] = [w - x, h - y]; break; case 3: [x, y] = [y, w - x]; break; }
+  return { x: c.x + x * GRID, y: c.y + y * GRID };
+}
+const SIDES = { L: { x: -1, y: 0 }, R: { x: 1, y: 0 }, T: { x: 0, y: -1 }, B: { x: 0, y: 1 } };
+function nrm(c, side) {
+  let { x, y } = SIDES[side] || SIDES.L;
+  if (c.flip) x = -x;
+  switch (c.rot & 3) { case 1: [x, y] = [-y, x]; break; case 2: [x, y] = [-x, -y]; break; case 3: [x, y] = [y, -x]; break; }
+  return { x, y };
+}
+function geomOf(c) {
+  const t = T[c.type]; const sz = t.size(c); const pins = t.pins(c); const r = c.rot & 1;
+  const bb = { x: c.x, y: c.y, w: (r ? sz.h : sz.w) * GRID, h: (r ? sz.w : sz.h) * GRID };
+  const wp = pins.map(p => { const q = xf(c, sz, p.x, p.y), n = nrm(c, p.side); return Object.assign({}, p, { wx: q.x, wy: q.y, nx: n.x, ny: n.y }); });
+  return { sz, bb, pins: wp, pm: new Map(wp.map(p => [p.n, p])) };
+}
+
+/* ---------- flat-netlist builder with union-find ---------- */
+class Builder {
+  constructor() { this.w = []; this.w0 = []; this.par = []; this.els = []; this.ports = { in: [], out: [] }; }
+  net(w) { const i = this.w.length; this.w.push(w); this.w0.push(w); this.par.push(i); return i; }
+  find(a) { const p = this.par; while (p[a] !== a) { p[a] = p[p[a]]; a = p[a]; } return a; }
+  union(a, b) { a = this.find(a); b = this.find(b); if (a === b) return; this.par[b] = a; if (this.w[b] > this.w[a]) this.w[a] = this.w[b]; }
+  el(t, i, o, p, tag) { this.els.push({ t, i, o, p, tag }); }
+  port(k, n, w, net, c) { this.ports[k].push({ n, w, net, x: c.x, y: c.y }); }
+  inst(t) {
+    const off = this.w.length;
+    for (const w of t.w) this.net(w);
+    for (const e of t.els) this.els.push({ t: e.t, i: e.i.map(n => n + off), o: e.o.map(n => n + off), p: e.p });
+    return off;
+  }
+  finish() {
+    const N = this.w.length, map = new Int32Array(N), rm = new Int32Array(N).fill(-1), W = [];
+    for (let i = 0; i < N; i++) { const r = this.find(i); if (rm[r] < 0) { rm[r] = W.length; W.push(this.w[r]); } map[i] = rm[r]; }
+    const els = this.els.map(e => ({ t: e.t, i: e.i.map(n => map[n]), o: e.o.map(n => map[n]), p: e.p, tag: e.tag }));
+    const pm = p => Object.assign({}, p, { net: map[p.net] });
+    return { w: W, els, ports: { in: this.ports.in.map(pm), out: this.ports.out.map(pm) }, map };
+  }
+}
+
+/* Compile a circuit. Custom chips are compiled once into cached flat templates
+   (hierarchical black boxes) and stamped in by offset — no visual re-expansion. */
+function compileCircuit(circ, top, cx0) {
+  const cx = { top, chain: cx0 ? cx0.chain : [], errors: cx0 ? cx0.errors : [] };
+  const b = new Builder(), pn = new Map();
+  for (const c of circ.components) { const t = T[c.type]; if (!t) continue; for (const p of t.pins(c)) pn.set(c.id + '|' + p.n, b.net(p.w)); }
+  for (const w of circ.wires) {
+    const x = pn.get(w.a.c + '|' + w.a.p), y = pn.get(w.b.c + '|' + w.b.p);
+    if (x !== undefined && y !== undefined && b.w0[x] === b.w0[y]) b.union(x, y);
+  }
+  for (const c of circ.components) { const t = T[c.type]; if (t && t.build) t.build(b, c, n => pn.get(c.id + '|' + n), cx); }
+  const srt = (p, q) => p.y - q.y || p.x - q.x;
+  b.ports.in.sort(srt); b.ports.out.sort(srt);
+  const r = b.finish();
+  if (top) { r.pinNet = new Map(); for (const [k, v] of pn) r.pinNet.set(k, r.map[v]); r.errors = cx.errors; }
+  return r;
+}
+function getTpl(d, cx) {
+  const e = TPL.get(d.id); if (e && e.d === d && e.ver === d.version) return e.t;
+  const t = compileCircuit(d.circuit, false, { chain: [...cx.chain, d.id], errors: cx.errors });
+  TPL.set(d.id, { d, ver: d.version, t }); return t;
+}
+
+/* ---------- event-driven simulator ----------
+   Every net bit resolves from all its drivers: driven-1 / driven-0 / floating (Z) / conflict (X short).
+   Floating reads as 0 (pull-down). Elements are evaluated from a FIFO work queue with immediate
+   net updates; each settle has an evaluation budget, so oscillators never hang the app. */
+const ET = { CONST: 0, SRC: 1, SW: 2, SPLIT: 3, MERGE: 4, ROM: 5, RAM: 6, OLED: 7 };
+const RT = new Map(); // persistent peripheral state (OLED framebuffers, RAM) keyed by top-level component id
+class Sim {
+  constructor(cp) {
+    const N = cp.w.length, els = cp.els, E = els.length;
+    this.N = N; this.E = E;
+    this.nw = Uint8Array.from(cp.w);
+    this.nm = new Int32Array(N); for (let i = 0; i < N; i++) this.nm[i] = M(cp.w[i]);
+    this.val = new Int32Array(N); this.zm = Int32Array.from(this.nm); this.xm = new Int32Array(N);
+    this.et = new Uint8Array(E); this.iS = new Int32Array(E + 1); this.oS = new Int32Array(E + 1);
+    let ni = 0, no = 0; for (const e of els) { ni += e.i.length; no += e.o.length; }
+    this.iL = new Int32Array(ni); this.sn = new Int32Array(no); this.s1 = new Int32Array(no); this.s0 = new Int32Array(no);
+    this.p = new Array(E); this.st = new Array(E).fill(null); this.sv = new Int32Array(E);
+    this.tags = new Map(); this.clocks = []; this.counts = {};
+    ni = 0; no = 0;
+    for (let e = 0; e < E; e++) {
+      const x = els[e]; this.et[e] = ET[x.t]; this.p[e] = x.p;
+      this.iS[e] = ni; for (const n of x.i) this.iL[ni++] = n;
+      this.oS[e] = no; for (const n of x.o) this.sn[no++] = n;
+      this.counts[x.t] = (this.counts[x.t] || 0) + 1;
+      if (x.tag) { let a = this.tags.get(x.tag); if (!a) this.tags.set(x.tag, a = []); a.push(e); }
+      if (x.t === 'SRC') { this.sv[e] = x.p.v | 0; if (x.p.kind === 'clock') this.clocks.push(e); }
+      else if (x.t === 'RAM') this.st[e] = this.mkRam(x);
+      else if (x.t === 'OLED') this.st[e] = this.mkOled(x);
+    }
+    this.iS[E] = ni; this.oS[E] = no;
+    const dS = new Int32Array(N + 1); for (let s = 0; s < no; s++) dS[this.sn[s] + 1]++;
+    for (let i = 0; i < N; i++) dS[i + 1] += dS[i];
+    const dL = new Int32Array(no), f = dS.slice(0, N); for (let s = 0; s < no; s++) dL[f[this.sn[s]]++] = s;
+    this.dS = dS; this.dL = dL;
+    const rS = new Int32Array(N + 1), uniqIn = e => { const out = []; for (let k = this.iS[e]; k < this.iS[e + 1]; k++) { const n = this.iL[k]; if (out.indexOf(n) < 0) out.push(n); } return out; };
+    const U = new Array(E); for (let e = 0; e < E; e++) { U[e] = uniqIn(e); for (const n of U[e]) rS[n + 1]++; }
+    for (let i = 0; i < N; i++) rS[i + 1] += rS[i];
+    const rL = new Int32Array(rS[N]), f2 = rS.slice(0, N); for (let e = 0; e < E; e++) for (const n of U[e]) rL[f2[n]++] = e;
+    this.rS = rS; this.rL = rL;
+    this.q = new Int32Array(E + 1); this.qh = 0; this.qt = 0; this.qn = 0; this.inQ = new Uint8Array(E);
+    for (let e = 0; e < E; e++) this.enq(e);
+    this.clk = 0; this.ticks = 0; this.evals = 0; this.changed = true; this.unstable = false;
+    this.budget = Math.max(200000, E * 60);
+  }
+  mkOled(x) {
+    const res = x.p.res || 32; let s = x.tag && RT.get(x.tag);
+    if (!s || s.kind !== 'oled' || s.res !== res) { s = { kind: 'oled', res, buf: new Uint8Array(res * res), dirty: true }; if (x.tag) RT.set(x.tag, s); }
+    s.pclk = 0; s.pclr = 0; s.dirty = true; return s;
+  }
+  mkRam(x) {
+    const n = 1 << x.p.ab; let s = x.tag && RT.get(x.tag);
+    if (!s || s.kind !== 'ram' || s.mem.length !== n) { s = { kind: 'ram', mem: new Int32Array(n) }; if (x.tag) RT.set(x.tag, s); }
+    s.prev = 0; return s;
+  }
+  enq(e) { if (!this.inQ[e]) { this.inQ[e] = 1; this.q[this.qt] = e; this.qt = (this.qt + 1) % this.q.length; this.qn++; } }
+  drive(s, a, b) {
+    if (this.s1[s] === a && this.s0[s] === b) return;
+    this.s1[s] = a; this.s0[s] = b;
+    const n = this.sn[s]; let A = 0, B = 0;
+    for (let k = this.dS[n], e = this.dS[n + 1]; k < e; k++) { const t = this.dL[k]; A |= this.s1[t]; B |= this.s0[t]; }
+    const m = this.nm[n]; A &= m; B &= m;
+    const v = A & ~B, x = A & B, z = ~(A | B) & m;
+    if (v !== this.val[n] || z !== this.zm[n] || x !== this.xm[n]) {
+      this.val[n] = v; this.zm[n] = z; this.xm[n] = x; this.changed = true;
+      for (let k = this.rS[n], e = this.rS[n + 1]; k < e; k++) this.enq(this.rL[k]);
+    }
+  }
+  ev(e) {
+    const i = this.iS[e], o = this.oS[e], iL = this.iL, val = this.val, zm = this.zm;
+    switch (this.et[e]) {
+      case 0: { const v = this.p[e].v ? -1 : 0; this.drive(o, v, ~v); break; }
+      case 1: { const v = this.sv[e]; this.drive(o, v, ~v); break; }
+      case 2: { const a = iL[i]; let on = val[iL[i + 1]] & 1; if (this.p[e].nc) on ^= 1;
+        if (on) this.drive(o, val[a], ~val[a] & ~zm[a]); else this.drive(o, 0, 0); break; }
+      case 3: { const a = iL[i], v = val[a], d = ~v & ~zm[a], n = this.oS[e + 1] - o;
+        for (let k = 0; k < n; k++) this.drive(o + k, (v >>> k) & 1, (d >>> k) & 1); break; }
+      case 4: { let A = 0, B = 0; const n = this.iS[e + 1] - i;
+        for (let k = 0; k < n; k++) { const a = iL[i + k]; A |= (val[a] & 1) << k; B |= ((~val[a] & ~zm[a]) & 1) << k; }
+        this.drive(o, A, B); break; }
+      case 5: { const v = this.p[e].data[val[iL[i]] >>> 0] | 0; this.drive(o, v, ~v); break; }
+      case 6: { const s = this.st[e], clk = val[iL[i + 3]] & 1, L = s.mem.length, ad = (val[iL[i]] >>> 0) % L;
+        if (clk && !s.prev && (val[iL[i + 2]] & 1)) s.mem[ad] = val[iL[i + 1]];
+        s.prev = clk; const v = s.mem[ad] | 0; this.drive(o, v, ~v); break; }
+      case 7: { const s = this.st[e], X = val[iL[i]] >>> 0, Y = val[iL[i + 1]] >>> 0, D = val[iL[i + 2]], we = val[iL[i + 3]] & 1,
+          cn = iL[i + 4], clk = val[cn] & 1, clr = val[iL[i + 5]] & 1;
+        if (clr && !s.pclr) { s.buf.fill(0); s.dirty = true; this.changed = true; } s.pclr = clr;
+        const hasClk = this.dS[cn + 1] > this.dS[cn];
+        const wr = hasClk ? (clk && !s.pclk && we) : we; s.pclk = clk;
+        if (wr && X < s.res && Y < s.res) { const k = Y * s.res + X, v = D & 255; if (s.buf[k] !== v) { s.buf[k] = v; s.dirty = true; this.changed = true; } }
+        break; }
+    }
+  }
+  settle(budget) {
+    budget = budget || this.budget; let n = 0; const q = this.q, L = q.length;
+    while (this.qn > 0 && n < budget) { const e = q[this.qh]; this.qh = (this.qh + 1) % L; this.qn--; this.inQ[e] = 0; this.ev(e); n++; }
+    this.evals += n; this.unstable = this.qn > 0; return n;
+  }
+  edge() { this.clk ^= 1; for (const e of this.clocks) { this.sv[e] = this.clk; this.enq(e); } this.ticks++; }
+  setSrc(tag, v) { const a = this.tags.get(tag); if (!a) return; for (const e of a) if (this.et[e] === 1) { this.sv[e] = v; this.enq(e); } }
+  srcVal(tag) { const a = this.tags.get(tag); return a ? this.sv[a[0]] : 0; }
+  shorts() { let c = 0; for (let i = 0; i < this.N; i++) if (this.xm[i]) c++; return c; }
+}
+
+/* ---------- ROM source parser: hex by default, 0b… binary, #/0d decimal, @addr, ; or // comments ---------- */
+function parseRom(src) {
+  const out = []; let a = 0, err = null;
+  String(src || '').split('\n').forEach((line, ln) => {
+    line = line.replace(/(;|\/\/).*$/, '');
+    for (let tok of line.split(/[\s,]+/)) {
+      if (!tok) continue;
+      if (tok.endsWith(':')) continue;
+      let v;
+      if (tok[0] === '@') { const n = parseInt(tok.slice(1), 16); if (isNaN(n)) err = err || `line ${ln + 1}: bad address ${tok}`; else a = n; continue; }
+      if (/^0b[01_]+$/i.test(tok)) v = parseInt(tok.slice(2).replace(/_/g, ''), 2);
+      else if (/^(#|0d)\d+$/i.test(tok)) v = parseInt(tok.replace(/^(#|0d)/i, ''), 10);
+      else if (/^(0x|\$)?[0-9a-f_]+$/i.test(tok)) v = parseInt(tok.replace(/^(0x|\$)/i, '').replace(/_/g, ''), 16);
+      else { err = err || `line ${ln + 1}: can't read "${tok}"`; continue; }
+      out[a++] = v | 0;
+    }
+  });
+  for (let i = 0; i < out.length; i++) if (out[i] === undefined) out[i] = 0;
+  return { data: out, err };
+}
+function romToSrc(data, dataBits) {
+  const hw = Math.max(1, Math.ceil((dataBits || 8) / 4)); let s = '';
+  for (let i = 0; i < data.length; i += 8) {
+    s += '@' + i.toString(16).toUpperCase().padStart(2, '0') + '  ' + data.slice(i, i + 8).map(v => ((v >>> 0) & M(dataBits || 8) >>> 0).toString(16).toUpperCase().padStart(hw, '0')).join(' ') + '\n';
+  }
+  return s;
+}
+
+/* =====================================================================
+   STARTER EXAMPLES (built programmatically, all logic from raw switches)
+   ===================================================================== */
+function newCirc(meta) { return { meta: Object.assign({ name: 'Untitled', category: 'Custom', color: '#4f8cff', icon: '', desc: '' }, meta || {}), components: [], wires: [] }; }
+function addC(ci, type, gx, gy, props, o) {
+  const t = T[type];
+  const c = { id: uid('c'), type, x: Math.round(gx * GRID), y: Math.round(gy * GRID), rot: 0, flip: false, props: Object.assign(clone(t.def || {}), props || {}) };
+  if (o) Object.assign(c, o); ci.components.push(c); return c;
+}
+const VF = { rot: 2, flip: true }; // mirror vertically (ctrl pin on top)
+function addW(ci, a, ap, b, bp, pts) {
+  const w = { id: uid('w'), a: { c: a.id, p: ap }, b: { c: b.id, p: bp } };
+  if (pts) w.pts = pts.map(([x, y]) => ({ x: Math.round(x * GRID), y: Math.round(y * GRID) }));
+  ci.wires.push(w); return w;
+}
+function defChip(id, circ) { const old = LIB.chips[id]; LIB.chips[id] = { id, version: (old ? old.version : 0) + 1, circuit: circ }; invalidate(); return id; }
+function pg(c, n) { const g = geomOf(c), p = g.pm.get(n); return { x: p.wx / GRID, y: p.wy / GRID }; }
+
+function exGates() {
+  let c = newCirc({ name: 'NOT', category: 'Gates', color: '#8b5cf6', icon: '¬', desc: 'Inverter: one normally-closed switch fed from Power. When A=1 the switch opens and Y floats (reads 0).' });
+  { const a = addC(c, 'input', 0, 4, { name: 'A' }), pw = addC(c, 'power', 3, 1), s = addC(c, 'sw_nc', 8, 1), y = addC(c, 'output', 13, 1, { name: 'Y' });
+    addW(c, pw, 'out', s, 'in'); addW(c, a, 'out', s, 'ctrl'); addW(c, s, 'out', y, 'in'); }
+  defChip('g_not', c);
+  const series = (id, name, t1, t2, color, icon, desc) => {
+    const c = newCirc({ name, category: 'Gates', color, icon, desc });
+    const a = addC(c, 'input', 0, 4, { name: 'A' }), b = addC(c, 'input', 0, 7, { name: 'B' }), pw = addC(c, 'power', 3, 1);
+    const s1 = addC(c, t1, 8, 1), s2 = addC(c, t2, 12, 1), y = addC(c, 'output', 17, 1, { name: 'Y' });
+    addW(c, pw, 'out', s1, 'in'); addW(c, s1, 'out', s2, 'in'); addW(c, s2, 'out', y, 'in'); addW(c, a, 'out', s1, 'ctrl'); addW(c, b, 'out', s2, 'ctrl');
+    defChip(id, c);
+  };
+  const parallel = (id, name, t, color, icon, desc) => {
+    const c = newCirc({ name, category: 'Gates', color, icon, desc });
+    const a = addC(c, 'input', 0, 0, { name: 'A' }), b = addC(c, 'input', 0, 10, { name: 'B' }), pw = addC(c, 'power', 3, 4);
+    const s1 = addC(c, t, 8, 2, {}, VF), s2 = addC(c, t, 8, 7), y = addC(c, 'output', 13, 4, { name: 'Y' });
+    addW(c, pw, 'out', s1, 'in'); addW(c, pw, 'out', s2, 'in'); addW(c, a, 'out', s1, 'ctrl'); addW(c, b, 'out', s2, 'ctrl');
+    addW(c, s1, 'out', y, 'in'); addW(c, s2, 'out', y, 'in');
+    defChip(id, c);
+  };
+  series('g_and', 'AND', 'sw_no', 'sw_no', '#3b82f6', '&', 'Two normally-open switches in series from Power.');
+  parallel('g_or', 'OR', 'sw_no', '#10b981', '≥1', 'Two normally-open switches in parallel from Power.');
+  parallel('g_nand', 'NAND', 'sw_nc', '#f59e0b', '⊼', 'Two normally-closed switches in parallel from Power.');
+  series('g_nor', 'NOR', 'sw_nc', 'sw_nc', '#ec4899', '⊽', 'Two normally-closed switches in series from Power.');
+  c = newCirc({ name: 'XOR', category: 'Gates', color: '#ef4444', icon: '⊕', desc: 'Two switch paths: (A and not B) or (not A and B). Built from 4 switches.' });
+  { const a = addC(c, 'input', 0, 0, { name: 'A' }), b = addC(c, 'input', 0, 14, { name: 'B' }), pw = addC(c, 'power', 3, 6);
+    const s1 = addC(c, 'sw_no', 8, 3, {}, VF), s2 = addC(c, 'sw_nc', 12, 3, {}, VF), s3 = addC(c, 'sw_nc', 8, 9), s4 = addC(c, 'sw_no', 12, 9), y = addC(c, 'output', 17, 6, { name: 'Y' });
+    addW(c, pw, 'out', s1, 'in'); addW(c, pw, 'out', s3, 'in'); addW(c, s1, 'out', s2, 'in'); addW(c, s3, 'out', s4, 'in');
+    addW(c, s2, 'out', y, 'in'); addW(c, s4, 'out', y, 'in');
+    addW(c, a, 'out', s1, 'ctrl'); addW(c, a, 'out', s3, 'ctrl', [[6, 13]]);
+    addW(c, b, 'out', s4, 'ctrl'); addW(c, b, 'out', s2, 'ctrl', [[11, 1.5]]); }
+  defChip('g_xor', c);
+}
+
+function exAdders() {
+  exGates();
+  let c = newCirc({ name: 'Half Adder', category: 'Arithmetic', color: '#06b6d4', icon: '½', desc: 'S = A xor B, C = A and B' });
+  { const a = addC(c, 'input', 0, 1, { name: 'A' }), b = addC(c, 'input', 0, 5, { name: 'B' });
+    const x = addC(c, 'chip', 7, 1, { chipId: 'g_xor' }), n = addC(c, 'chip', 7, 6, { chipId: 'g_and' });
+    const s = addC(c, 'output', 14, 1, { name: 'S' }), co = addC(c, 'output', 14, 6, { name: 'C' });
+    addW(c, a, 'out', x, 'A'); addW(c, a, 'out', n, 'A', [[4, 7]]); addW(c, b, 'out', x, 'B'); addW(c, b, 'out', n, 'B');
+    addW(c, x, 'Y', s, 'in'); addW(c, n, 'Y', co, 'in'); }
+  defChip('a_half', c);
+  c = newCirc({ name: 'Full Adder', category: 'Arithmetic', color: '#0ea5e9', icon: 'Σ', desc: 'Two half adders + OR for the carry.' });
+  { const a = addC(c, 'input', 0, 1, { name: 'A' }), b = addC(c, 'input', 0, 4, { name: 'B' }), ci = addC(c, 'input', 0, 8, { name: 'Cin' });
+    const h1 = addC(c, 'chip', 6, 1, { chipId: 'a_half' }), h2 = addC(c, 'chip', 15, 4, { chipId: 'a_half' }), o = addC(c, 'chip', 23, 8, { chipId: 'g_or' });
+    const s = addC(c, 'output', 23, 4, { name: 'S' }), co = addC(c, 'output', 29, 8, { name: 'Cout' });
+    addW(c, a, 'out', h1, 'A'); addW(c, b, 'out', h1, 'B'); addW(c, h1, 'S', h2, 'A'); addW(c, ci, 'out', h2, 'B');
+    addW(c, h1, 'C', o, 'A', [[12, pg(o, 'A').y]]); addW(c, h2, 'C', o, 'B'); addW(c, h2, 'S', s, 'in'); addW(c, o, 'Y', co, 'in'); }
+  defChip('a_full', c);
+  c = newCirc({ name: '4-bit Adder', category: 'Arithmetic', color: '#14b8a6', icon: '+', desc: 'Ripple-carry adder from four full adders.' });
+  { const a = addC(c, 'input', 0, 0, { name: 'A', width: 4 }), b = addC(c, 'input', 0, 7, { name: 'B', width: 4 }), ci = addC(c, 'input', 0, -4, { name: 'Cin' });
+    const sa = addC(c, 'split', 8, 0, { width: 4 }), sb = addC(c, 'split', 8, 7, { width: 4 });
+    addW(c, a, 'out', sa, 'in'); addW(c, b, 'out', sb, 'in');
+    const fa = []; for (let i = 0; i < 4; i++) fa.push(addC(c, 'chip', 16, 1 + 6 * i, { chipId: 'a_full' }));
+    const mg = addC(c, 'merge', 27, 9, { width: 4 }), so = addC(c, 'output', 32, 9, { name: 'S', width: 4 }), co = addC(c, 'output', 30, 20, { name: 'Cout' });
+    const lanes = [23.5, 23, 24, 24.5];
+    for (let i = 0; i < 4; i++) {
+      addW(c, sa, 'b' + i, fa[i], 'A', [[11 + 0.5 * i, pg(fa[i], 'A').y]]);
+      addW(c, sb, 'b' + i, fa[i], 'B', [[13 + 0.5 * i, pg(fa[i], 'B').y]]);
+      addW(c, fa[i], 'S', mg, 'b' + i, [[lanes[i], pg(mg, 'b' + i).y]]);
+      if (i < 3) { const y = pg(fa[i], 'Cout').y + 3; addW(c, fa[i], 'Cout', fa[i + 1], 'Cin', [[22, y], [15, y]]); }
+    }
+    addW(c, ci, 'out', fa[0], 'Cin', [[15, pg(ci, 'out').y]]);
+    addW(c, fa[3], 'Cout', co, 'in'); addW(c, mg, 'out', so, 'in'); }
+  defChip('a_add4', c);
+}
+
+function exSequential() {
+  exAdders();
+  // D latch, hazard-free: Q = D·E + Q·¬E + D·Q
+  let c = newCirc({ name: 'D Latch', category: 'Memory', color: '#a855f7', icon: 'L', desc: 'Transparent while E=1, holds while E=0. Hazard-free cover (D·E + Q·¬E + D·Q).' });
+  { const d = addC(c, 'input', 0, 1, { name: 'D' }), e = addC(c, 'input', 0, 9, { name: 'E' });
+    const nt = addC(c, 'chip', 6, 14, { chipId: 'g_not' });
+    const a1 = addC(c, 'chip', 12, 1, { chipId: 'g_and' }), a2 = addC(c, 'chip', 12, 6, { chipId: 'g_and' }), a3 = addC(c, 'chip', 12, 11, { chipId: 'g_and' });
+    const o1 = addC(c, 'chip', 18, 3, { chipId: 'g_or' }), o2 = addC(c, 'chip', 24, 6, { chipId: 'g_or' });
+    const q = addC(c, 'output', 30, 6, { name: 'Q' });
+    addW(c, d, 'out', a1, 'A'); addW(c, d, 'out', a3, 'A', [[10, pg(a3, 'A').y]]);
+    addW(c, e, 'out', a1, 'B', [[8, pg(a1, 'B').y]]); addW(c, e, 'out', nt, 'A');
+    addW(c, nt, 'Y', a2, 'B');
+    addW(c, a1, 'Y', o1, 'A'); addW(c, a2, 'Y', o1, 'B'); addW(c, o1, 'Y', o2, 'A'); addW(c, a3, 'Y', o2, 'B');
+    addW(c, o2, 'Y', q, 'in');
+    addW(c, o2, 'Y', a2, 'A', [[28, 17.5], [11, 17.5], [11, pg(a2, 'A').y]]);
+    addW(c, o2, 'Y', a3, 'B', [[28, 17.5], [11.5, 17.5], [11.5, pg(a3, 'B').y]]); }
+  defChip('m_dlatch', c);
+  c = newCirc({ name: 'D Flip-Flop', category: 'Memory', color: '#9333ea', icon: 'FF', desc: 'Rising-edge master/slave flip-flop from two D latches.' });
+  { const d = addC(c, 'input', 0, 1, { name: 'D' }), k = addC(c, 'input', 0, 5, { name: 'CLK' });
+    const nt = addC(c, 'chip', 5, 7, { chipId: 'g_not' }), m = addC(c, 'chip', 11, 1, { chipId: 'm_dlatch' }), s = addC(c, 'chip', 18, 4, { chipId: 'm_dlatch' });
+    const q = addC(c, 'output', 25, 4, { name: 'Q' });
+    addW(c, d, 'out', m, 'D'); addW(c, k, 'out', nt, 'A'); addW(c, nt, 'Y', m, 'E'); addW(c, m, 'Q', s, 'D'); addW(c, k, 'out', s, 'E'); addW(c, s, 'Q', q, 'in'); }
+  defChip('m_dff', c);
+  c = newCirc({ name: '8-bit Counter', category: 'Memory', color: '#7c3aed', icon: '++', desc: '8 D flip-flops + a half-adder incrementer chain. Counts on every rising CLK edge.' });
+  { const k = addC(c, 'input', 0, 0, { name: 'CLK' }), pw = addC(c, 'power', 16, -3);
+    const ff = [], ha = [];
+    for (let i = 0; i < 8; i++) { const y0 = 2 + 6 * i; ff.push(addC(c, 'chip', 8, y0, { chipId: 'm_dff' })); ha.push(addC(c, 'chip', 20, y0, { chipId: 'a_half' })); }
+    const mg = addC(c, 'merge', 24, 50, { width: 8 }), q = addC(c, 'output', 28, 50, { name: 'Q', width: 8 });
+    addW(c, pw, 'out', ha[0], 'B');
+    for (let i = 0; i < 8; i++) {
+      const y0 = 2 + 6 * i, f = ff[i], h = ha[i];
+      addW(c, k, 'out', f, 'CLK', [[6, pg(f, 'CLK').y]]);
+      addW(c, f, 'Q', h, 'A');
+      addW(c, f, 'Q', mg, 'b' + i, [[14.5 + 0.5 * i, pg(mg, 'b' + i).y]]);
+      addW(c, h, 'S', f, 'D', [[28, y0 + 4], [7, y0 + 4]]);
+      if (i < 7) addW(c, h, 'C', ha[i + 1], 'B', [[26.5, y0 + 5], [19, y0 + 5]]);
+    }
+    addW(c, mg, 'out', q, 'in'); }
+  defChip('m_cnt8', c);
+}
+
+function ex1() {
+  exGates();
+  const c = newCirc({ name: 'Switch-level Gates Demo', category: 'Demos', color: '#64748b' });
+  addC(c, 'note', 0, -5, { text: 'NOT from ONE normally-closed switch.\nPower → NC → LED. A=1 opens the switch → output floats → reads 0.' });
+  { const pw = addC(c, 'power', 2, 0), s = addC(c, 'sw_nc', 7, 0), l = addC(c, 'led', 12, 0, { color: '#22c55e' }), t = addC(c, 'toggle', 2, 4, { label: 'A' });
+    addW(c, pw, 'out', s, 'in'); addW(c, t, 'out', s, 'ctrl'); addW(c, s, 'out', l, 'in'); }
+  addC(c, 'note', 0, 9, { text: 'XOR from FOUR switches: (A and not B) or (not A and B).' });
+  { const a = addC(c, 'toggle', 1, 11, { label: 'A' }), b = addC(c, 'toggle', 1, 25, { label: 'B' }), pw = addC(c, 'power', 3, 17);
+    const s1 = addC(c, 'sw_no', 8, 14, {}, VF), s2 = addC(c, 'sw_nc', 12, 14, {}, VF), s3 = addC(c, 'sw_nc', 8, 20), s4 = addC(c, 'sw_no', 12, 20), l = addC(c, 'led', 17, 17, { color: '#f59e0b' });
+    addW(c, pw, 'out', s1, 'in'); addW(c, pw, 'out', s3, 'in'); addW(c, s1, 'out', s2, 'in'); addW(c, s3, 'out', s4, 'in');
+    addW(c, s2, 'out', l, 'in'); addW(c, s4, 'out', l, 'in');
+    addW(c, a, 'out', s1, 'ctrl'); addW(c, a, 'out', s3, 'ctrl', [[6, 24]]); addW(c, b, 'out', s4, 'ctrl'); addW(c, b, 'out', s2, 'ctrl', [[11, 12.5]]); }
+  addC(c, 'note', 24, -5, { text: 'CMOS-style inverter: Power→NC and Ground→NO\nshare one output, so it is always actively driven.' });
+  { const pw = addC(c, 'power', 26, 0), gd = addC(c, 'ground', 26, 4), t = addC(c, 'toggle', 26, 8, { label: 'A' });
+    const p = addC(c, 'sw_nc', 31, 0), n = addC(c, 'sw_no', 31, 4), l = addC(c, 'led', 36, 2, { color: '#38bdf8' });
+    addW(c, pw, 'out', p, 'in'); addW(c, gd, 'out', n, 'in'); addW(c, t, 'out', p, 'ctrl', [[29.5, 2.5]]); addW(c, t, 'out', n, 'ctrl');
+    addW(c, p, 'out', l, 'in'); addW(c, n, 'out', l, 'in'); }
+  addC(c, 'note', 24, 12, { text: 'Short-circuit demo: hold the button to tie Ground\nonto a net that Power drives. The wire turns red.' });
+  { const pw = addC(c, 'power', 26, 15), gd = addC(c, 'ground', 26, 19), bt = addC(c, 'button', 26, 23, { label: 'short' });
+    const n = addC(c, 'sw_no', 31, 19), l = addC(c, 'led', 36, 15);
+    addW(c, pw, 'out', l, 'in'); addW(c, gd, 'out', n, 'in'); addW(c, bt, 'out', n, 'ctrl'); addW(c, n, 'out', l, 'in', [[34, 16]]); }
+  addC(c, 'note', 44, -5, { text: 'The same logic saved as reusable chips.\nDouble-click a chip to look inside.' });
+  { const a = addC(c, 'toggle', 44, 0, { label: 'A' }), b = addC(c, 'toggle', 44, 4, { label: 'B' });
+    const nt = addC(c, 'chip', 50, -1, { chipId: 'g_not' }), x = addC(c, 'chip', 50, 3, { chipId: 'g_xor' }), an = addC(c, 'chip', 50, 7, { chipId: 'g_and' }), o = addC(c, 'chip', 50, 11, { chipId: 'g_or' });
+    const l1 = addC(c, 'led', 56, -1, { color: '#22c55e' }), l2 = addC(c, 'led', 56, 3, { color: '#f59e0b' }), l3 = addC(c, 'led', 56, 7, { color: '#3b82f6' }), l4 = addC(c, 'led', 56, 11, { color: '#10b981' });
+    addW(c, a, 'out', nt, 'A'); addW(c, a, 'out', x, 'A'); addW(c, b, 'out', x, 'B');
+    addW(c, a, 'out', an, 'A', [[47, 8]]); addW(c, b, 'out', an, 'B', [[48, 9]]); addW(c, a, 'out', o, 'A', [[47, 12]]); addW(c, b, 'out', o, 'B', [[48, 13]]);
+    addW(c, nt, 'Y', l1, 'in'); addW(c, x, 'Y', l2, 'in'); addW(c, an, 'Y', l3, 'in'); addW(c, o, 'Y', l4, 'in'); }
+  return c;
+}
+
+function ex2() {
+  exAdders();
+  const c = newCirc({ name: '4-bit Adder Calculator', category: 'Demos', color: '#64748b' });
+  addC(c, 'note', 0, -9, { text: 'Click the bits of A and B. The 4-bit adder chip is built from\nFull Adder → Half Adder → XOR/AND → raw switches (double-click to dive in).' });
+  const a = addC(c, 'input', 0, 0, { name: 'A', width: 4, value: 5 }), b = addC(c, 'input', 0, 6, { name: 'B', width: 4, value: 9 }), ci = addC(c, 'toggle', 3, 11, { label: 'Cin' });
+  const ad = addC(c, 'chip', 10, 3, { chipId: 'a_add4' });
+  const ra = addC(c, 'busread', 8, -5, { width: 4, label: 'A' });
+  const sg = addC(c, 'seg7', 21, -2, { mode: 'hex', color: '#ff3b3b' }), rs = addC(c, 'busread', 21, 6, { width: 4, label: 'Sum' }), l = addC(c, 'led', 20, 10, { color: '#facc15', label: 'Cout' });
+  addW(c, a, 'out', ad, 'A'); addW(c, b, 'out', ad, 'B'); addW(c, ci, 'out', ad, 'Cin', [[8.5, 12]]);
+  addW(c, a, 'out', ra, 'in');
+  addW(c, ad, 'S', sg, 'v'); addW(c, ad, 'S', rs, 'in'); addW(c, ad, 'Cout', l, 'in');
+  return c;
+}
+
+function plotPoints() {
+  const pts = [], add = (x, y) => pts.push([Math.max(0, Math.min(31, Math.round(x))), Math.max(0, Math.min(31, Math.round(y)))]);
+  for (let k = 0; k < 112; k++) { const t = 2 * Math.PI * k / 112; add(15.5 + 12.5 * Math.cos(t), 15.5 + 12.5 * Math.sin(t)); }
+  for (const [x, y] of [[11, 11], [12, 11], [11, 12], [12, 12], [19, 11], [20, 11], [19, 12], [20, 12]]) add(x, y);
+  for (let k = 0; k < 40; k++) { const t = Math.PI * (0.15 + 0.7 * k / 39); add(15.5 + 7.5 * Math.cos(t), 16 + 5.5 * Math.sin(t)); }
+  for (let k = 0; pts.length < 256; k++) { const s = k % 96, side = (k / 24 | 0) % 4, u = (s % 24) * 31 / 23;
+    if (side === 0) add(u, 0); else if (side === 1) add(31, u); else if (side === 2) add(31 - u, 31); else add(0, 31 - u); }
+  return pts.slice(0, 256);
+}
+
+function ex3() {
+  exSequential();
+  const c = newCirc({ name: 'OLED Counter & Pixel Plotter', category: 'Demos', color: '#64748b' });
+  addC(c, 'note', 0, -9, { text: 'A switch-built 8-bit counter steps through two ROMs that hold X/Y\ncoordinates, plotting a picture on the OLED one pixel per clock.\nRaise the clock rate or tick Turbo to draw faster.' });
+  const pts = plotPoints();
+  const k = addC(c, 'clock', 0, 3, { label: 'CLK' }), cn = addC(c, 'chip', 6, 2, { chipId: 'm_cnt8' });
+  const rx = addC(c, 'rom', 17, 0, { addrBits: 8, dataBits: 5, data: pts.map(p => p[0]) }), ry = addC(c, 'rom', 17, 5, { addrBits: 8, dataBits: 5, data: pts.map(p => p[1]) });
+  rx.props.src = romToSrc(rx.props.data, 5); ry.props.src = romToSrc(ry.props.data, 5);
+  const ol = addC(c, 'oled', 27, 0, { res: 32, color: 'mono' }), pw = addC(c, 'power', 23, 9), nt = addC(c, 'chip', 20, 11, { chipId: 'g_not' });
+  const rd = addC(c, 'busread', 14, -5, { width: 8, label: 'count' });
+  addW(c, k, 'out', cn, 'CLK'); addW(c, cn, 'Q', rx, 'a'); addW(c, cn, 'Q', ry, 'a'); addW(c, cn, 'Q', rd, 'in', [[13.5, -4]]);
+  addW(c, rx, 'd', ol, 'x'); addW(c, ry, 'd', ol, 'y'); addW(c, pw, 'out', ol, 'd'); addW(c, pw, 'out', ol, 'we');
+  addW(c, k, 'out', nt, 'A', [[4, 12]]); addW(c, nt, 'Y', ol, 'clk');
+  addC(c, 'note', 0, 16, { text: 'Manual pixel plotter: set X and Y, then press PLOT.\nThe OLED has no CLK wired, so it writes while WE is held.' });
+  const ix = addC(c, 'input', 4, 19, { name: 'X', width: 5, value: 3 }), iy = addC(c, 'input', 4, 23, { name: 'Y', width: 5, value: 3 }), bt = addC(c, 'button', 7, 27, { label: 'PLOT' });
+  const cl = addC(c, 'button', 7, 31, { label: 'CLEAR' }), on = addC(c, 'power', 7, 35);
+  const o2 = addC(c, 'oled', 16, 20, { res: 32, color: 'mono' });
+  addW(c, ix, 'out', o2, 'x'); addW(c, iy, 'out', o2, 'y'); addW(c, on, 'out', o2, 'd', [[12, 23]]); addW(c, bt, 'out', o2, 'we', [[13, 24]]); addW(c, cl, 'out', o2, 'clr', [[14, 26]]);
+  return c;
+}
+const EXAMPLES = [
+  { id: 1, name: 'Switch-level NOT / XOR demo', build: ex1 },
+  { id: 2, name: '4-bit adder with displays', build: ex2 },
+  { id: 3, name: 'OLED counter & pixel plotter', build: ex3 },
+];
+
+</script>
+<script>
+'use strict';
+/* =====================================================================
+   UI — classic docked EDA-style editor
+   ===================================================================== */
+const $ = s => document.querySelector(s);
+const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]));
+const cv = $('#cv'), g = cv.getContext('2d'), an = $('#an'), ag = an.getContext('2d');
+let DPR = Math.max(1, window.devicePixelRatio || 1);
+const KEY = 'switchboard.v2', OLDKEY = 'switchboard.v1', UIKEY = 'switchboard.ui';
+const UIF = 'Segoe UI, Tahoma, Geneva, Verdana, sans-serif', MONO = 'Consolas, Monaco, Courier New, monospace';
+const CL = { on: '#00e676', off: '#3f6b4c', z: '#7d8796', x: '#ff3b30', bus: '#3d9df2', busOff: '#2f5a80', none: '#6a6a6a', bad: '#ffb300', sel: '#0078d7' };
+const BODY = '#393b3d', EDGE = '#8a8f93', TXT = '#e0e0e0', SUB = '#9da3a8';
+
+const S = {
+  main: null, levels: [], view: { x: -40, y: -40, z: 1 },
+  sel: new Set(), selW: new Set(), snap: true, grid: true, running: true, hz: 4, turbo: false,
+  sim: null, cmp: null, need: true, dirty: true, anDirty: true, geoV: 0,
+  traces: [], clip: null, pasteN: 0, place: null, wiring: null, mouse: { x: 0, y: 0 }, space: false, acc: 0,
+  ui: { palW: 220, insW: 290, anH: 150, pal: true, ins: true, an: true, col: {} },
+};
+const L = () => S.levels[S.levels.length - 1];
+const C = () => L().circ;
+const sn = v => (S.snap ? Math.round(v / GRID) * GRID : Math.round(v));
+const half = v => Math.round(v / (GRID / 2)) * (GRID / 2);
+
+/* ---------------- status-bar messages ---------------- */
+let msgT = 0;
+function toast(msg, err) { const t = $('#sbMsg'); t.textContent = msg; t.className = err ? 'err' : 'ok'; clearTimeout(msgT); msgT = setTimeout(hint, err ? 6000 : 4000); }
+function hint() {
+  const t = $('#sbMsg'); t.className = '';
+  t.textContent = S.place ? 'Click to place. Shift+click places several. Esc cancels.'
+    : S.wiring ? 'Click a pin to connect. Click empty canvas to add a bend. Esc or right-click cancels.'
+    : L() && L().chipId ? 'Editing chip definition. Input/Output ports become the chip pins.'
+    : 'Ready';
+}
+
+/* ---------------- persistence ---------------- */
+let saveT = 0;
+function persist() {
+  clearTimeout(saveT);
+  saveT = setTimeout(() => {
+    try { localStorage.setItem(KEY, JSON.stringify({ main: S.main, chips: LIB.chips, hz: S.hz, snap: S.snap })); localStorage.setItem(UIKEY, JSON.stringify(Object.assign({}, S.ui, { grid: S.grid }))); }
+    catch (e) { toast('Could not save to localStorage: ' + e.message, true); }
+  }, 400);
+}
+function loadSaved() {
+  try { const u = JSON.parse(localStorage.getItem(UIKEY) || 'null'); if (u) { Object.assign(S.ui, u); if (u.grid != null) S.grid = u.grid; S.ui.col = u.col || {}; } } catch (e) {}
+  try { const o = JSON.parse(localStorage.getItem(KEY) || 'null'); if (o && o.main) { LIB.chips = o.chips || {}; S.main = o.main; S.hz = o.hz || 4; S.snap = o.snap !== false; return true; } } catch (e) { console.warn(e); }
+  return false;
+}
+const hasOld = () => { try { return !!localStorage.getItem(OLDKEY); } catch (e) { return false; } };
+
+/* ---------------- change tracking & undo ---------------- */
+function bump() { S.geoV++; S.dirty = true; }
+function changed(noInspector) { bump(); S.need = true; persist(); if (!noInspector) renderInspector(); }
+function snapshot() { return JSON.stringify(C()); }
+function commit(snap) { const l = L(); l.undo.push(snap || snapshot()); if (l.undo.length > 200) l.undo.shift(); l.redo.length = 0; if (l.chipId) { l.edited = true; renderCrumbs(); } updUndo(); }
+function restore(json) { const o = JSON.parse(json), c = C(); c.meta = o.meta; c.components = o.components; c.wires = o.wires; S.sel.clear(); S.selW.clear(); changed(); }
+function undo() { const l = L(); if (!l.undo.length) return; l.redo.push(snapshot()); restore(l.undo.pop()); updUndo(); }
+function redo() { const l = L(); if (!l.redo.length) return; l.undo.push(snapshot()); restore(l.redo.pop()); updUndo(); }
+function updUndo() { const u = $('#tbUndo'), r = $('#tbRedo'); if (u) u.disabled = !L().undo.length; if (r) r.disabled = !L().redo.length; }
+
+/* ---------------- geometry caches ---------------- */
+let CM = null, CMv = -1; const GC = new Map(); let GCv = -1; const WC = new Map(); let WCv = -1; let PC = null, PCv = -1;
+function cmap() { if (CMv !== S.geoV || !CM) { CM = new Map(C().components.map(c => [c.id, c])); CMv = S.geoV; } return CM; }
+function G(c) { if (GCv !== S.geoV) { GC.clear(); GCv = S.geoV; } let r = GC.get(c.id); if (!r) { r = geomOf(c); GC.set(c.id, r); } return r; }
+function pinConn() { if (PCv !== S.geoV || !PC) { PC = new Map(); PCv = S.geoV; for (const w of C().wires) { const a = w.a.c + '|' + w.a.p, b = w.b.c + '|' + w.b.p; PC.set(a, (PC.get(a) || 0) + 1); PC.set(b, (PC.get(b) || 0) + 1); } } return PC; }
+function route(pa, na, pb, nb, pts) {
+  const s = GRID / 2, a1 = { x: pa.x + na.x * s, y: pa.y + na.y * s }, b1 = { x: pb.x + nb.x * s, y: pb.y + nb.y * s };
+  const out = [pa, a1]; let cur = a1, horiz = na.x !== 0; const seq = (pts || []).concat([b1]);
+  for (let i = 0; i < seq.length; i++) {
+    const t = seq[i], last = i === seq.length - 1;
+    if (cur.x === t.x || cur.y === t.y) out.push(t);
+    else if (last) {
+      const endH = nb.x !== 0 || (nb.x === 0 && nb.y === 0);
+      if (horiz && endH) { const mx = half((cur.x + t.x) / 2); out.push({ x: mx, y: cur.y }, { x: mx, y: t.y }, t); }
+      else if (!horiz && !endH) { const my = half((cur.y + t.y) / 2); out.push({ x: cur.x, y: my }, { x: t.x, y: my }, t); }
+      else if (horiz) out.push({ x: t.x, y: cur.y }, t);
+      else out.push({ x: cur.x, y: t.y }, t);
+    } else out.push(horiz ? { x: t.x, y: cur.y } : { x: cur.x, y: t.y }, t);
+    const p = out[out.length - 2]; horiz = p.x === t.x; cur = t;
+  }
+  out.push(pb);
+  const r = [out[0]];
+  for (let i = 1; i < out.length; i++) { const p = out[i], q = r[r.length - 1]; if (p.x === q.x && p.y === q.y) continue;
+    if (r.length >= 2) { const o = r[r.length - 2]; if ((o.x === q.x && q.x === p.x) || (o.y === q.y && q.y === p.y)) { r[r.length - 1] = p; continue; } }
+    r.push(p); }
+  return r;
+}
+function wGeom(w) {
+  if (WCv !== S.geoV) { WC.clear(); WCv = S.geoV; }
+  let r = WC.get(w.id); if (r !== undefined) return r;
+  const m = cmap(), ca = m.get(w.a.c), cb = m.get(w.b.c); r = null;
+  if (ca && cb) {
+    const pa = G(ca).pm.get(w.a.p), pb = G(cb).pm.get(w.b.p);
+    if (pa && pb) {
+      const pts = route({ x: pa.wx, y: pa.wy }, { x: pa.nx, y: pa.ny }, { x: pb.wx, y: pb.wy }, { x: pb.nx, y: pb.ny }, w.pts);
+      let x0 = 1e9, y0 = 1e9, x1 = -1e9, y1 = -1e9; for (const p of pts) { x0 = Math.min(x0, p.x); y0 = Math.min(y0, p.y); x1 = Math.max(x1, p.x); y1 = Math.max(y1, p.y); }
+      r = { pts, bb: { x: x0, y: y0, w: x1 - x0, h: y1 - y0 }, bus: pa.w > 1, bad: pa.w !== pb.w };
+    }
+  }
+  WC.set(w.id, r); return r;
+}
+
+/* ---------------- compile / simulate ---------------- */
+function recompile() {
+  S.need = false;
+  try {
+    const cp = compileCircuit(C(), true);
+    S.cmp = cp; S.sim = new Sim(cp); S.sim.settle();
+    if (cp.errors.length) toast(cp.errors[0], true);
+  } catch (e) { console.error(e); toast('Compile error: ' + e.message, true); S.cmp = null; S.sim = null; }
+  for (const t of S.traces) t.net = S.cmp ? S.cmp.pinNet.get(t.c + '|' + t.p) : undefined;
+  S.dirty = true; S.anDirty = true; sample();
+}
+function netOf(cid, p) { return S.cmp ? S.cmp.pinNet.get(cid + '|' + p) : undefined; }
+function nstate(n) {
+  const s = S.sim; if (!s || n === undefined || n >= s.N) return 'none';
+  if (s.xm[n]) return 'x';
+  if (s.nw[n] === 1) return s.zm[n] ? 'z' : (s.val[n] & 1 ? 'on' : 'off');
+  if (s.zm[n] === s.nm[n]) return 'z';
+  return s.val[n] ? 'bus' : 'busOff';
+}
+const bit = n => { const s = S.sim; return s && n !== undefined && n < s.N ? s.val[n] & 1 : 0; };
+const nval = n => { const s = S.sim; return s && n !== undefined && n < s.N ? s.val[n] >>> 0 : 0; };
+function hex(v, w) { return (v >>> 0).toString(16).toUpperCase().padStart(Math.ceil(w / 4), '0'); }
+function valText(n, long) {
+  const s = S.sim; if (!s || n === undefined) return '-';
+  const w = s.nw[n], v = s.val[n] >>> 0, z = s.zm[n], x = s.xm[n];
+  if (w === 1) return x ? 'SHORT (1 vs 0)' : z ? 'Z (floating -> 0)' : String(v);
+  let t = long ? `0b${v.toString(2).padStart(w, '0')}\n0x${hex(v, w)}  ${v}` : `0x${hex(v, w)} (${v})`;
+  if (x) t += long ? `\nSHORT bits 0b${(x >>> 0).toString(2).padStart(w, '0')}` : ' SHORT';
+  else if (z === s.nm[n]) t = 'Z (floating -> 0)';
+  else if (z && long) t += `\nfloating bits 0b${(z >>> 0).toString(2).padStart(w, '0')}`;
+  return t;
+}
+function setSrc(c, v) { if (S.sim) { S.sim.setSrc(c.id, v); S.sim.settle(); sample(); S.dirty = true; } }
+
+/* ---------------- drawing helpers ---------------- */
+function rr(x, y, w, h, r) { g.beginPath(); if (!r) { g.rect(x, y, w, h); return; } g.moveTo(x + r, y); g.arcTo(x + w, y, x + w, y + h, r); g.arcTo(x + w, y + h, x, y + h, r); g.arcTo(x, y + h, x, y, r); g.arcTo(x, y, x + w, y, r); g.closePath(); }
+function txt(s, x, y, size, color, align, weight, font) { g.font = `${weight || 400} ${size}px ${font || UIF}`; g.fillStyle = color; g.textAlign = align || 'center'; g.textBaseline = 'middle'; g.fillText(s, x, y); }
+function body(c, bb, fill, stroke, sel) { g.fillStyle = fill; g.fillRect(bb.x + .5, bb.y + .5, bb.w - 1, bb.h - 1); g.lineWidth = sel ? 2 : 1; g.strokeStyle = sel ? CL.sel : stroke; g.strokeRect(bb.x + .5, bb.y + .5, bb.w - 1, bb.h - 1); }
+function mix(hexc, a) { const n = parseInt(String(hexc).slice(1), 16) || 0; return `rgba(${n >> 16 & 255},${n >> 8 & 255},${n & 255},${a})`; }
+function caption(bb, s) { if (s) txt(s, bb.x + bb.w / 2, bb.y - 7, 10, SUB, 'center', 400); }
+function pinLabels(gm) { for (const p of gm.pins) { if (!p.label) continue; const x = p.wx - p.nx * 5, y = p.wy - p.ny * 6; txt(p.label, x, y, 9, '#b4bac0', p.nx < 0 ? 'left' : p.nx > 0 ? 'right' : 'center', 400); } }
+function cellsOf(c, bb) {
+  const w = clampW(c.props.width), horiz = bb.w >= bb.h, pad = 5, out = [];
+  const len = (horiz ? bb.w : bb.h) - pad * 2, cs = len / w;
+  for (let k = 0; k < w; k++) { const bitI = w - 1 - k; out.push(horiz ? { x: bb.x + pad + k * cs, y: bb.y + 9, w: cs, h: bb.h - 18, b: bitI } : { x: bb.x + 9, y: bb.y + pad + k * cs, w: bb.w - 18, h: cs, b: bitI }); }
+  return out;
+}
+
+/* ---------------- component renderers ---------------- */
+const DR = {
+  power(c, gm, sel) { const bb = gm.bb; body(c, bb, BODY, EDGE, sel); txt('1', bb.x + bb.w / 2, bb.y + bb.h / 2 - 3, 15, '#ff7a6e', 'center', 700, MONO); txt('VCC', bb.x + bb.w / 2, bb.y + bb.h - 7, 7.5, SUB); },
+  ground(c, gm, sel) { const bb = gm.bb; body(c, bb, BODY, EDGE, sel); txt('0', bb.x + bb.w / 2, bb.y + bb.h / 2 - 3, 15, '#9fb3c8', 'center', 700, MONO); txt('GND', bb.x + bb.w / 2, bb.y + bb.h - 7, 7.5, SUB); },
+  toggle(c, gm, sel) {
+    const bb = gm.bb, on = c.props.value & 1; body(c, bb, BODY, EDGE, sel);
+    const tx = bb.x + 6, ty = bb.y + bb.h / 2 - 6, tw = bb.w - 12; g.fillStyle = on ? '#1d6b3f' : '#232425'; g.fillRect(tx, ty, tw, 12); g.strokeStyle = '#6d7377'; g.lineWidth = 1; g.strokeRect(tx + .5, ty + .5, tw - 1, 11);
+    g.fillStyle = on ? CL.on : '#a0a6ab'; g.fillRect(on ? tx + tw - 11 : tx + 1, ty + 1, 10, 10);
+    caption(bb, c.props.label);
+  },
+  button(c, gm, sel) {
+    const bb = gm.bb, on = S.sim ? S.sim.srcVal(c.id) : 0; body(c, bb, BODY, EDGE, sel);
+    const s = 18, x = bb.x + (bb.w - s) / 2, y = bb.y + (bb.h - s) / 2; g.fillStyle = on ? '#e08a00' : '#2a2b2c'; g.fillRect(x, y, s, s); g.strokeStyle = on ? '#ffc04d' : '#8a8f93'; g.lineWidth = 1.5; g.strokeRect(x, y, s, s);
+    caption(bb, c.props.label);
+  },
+  clock(c, gm, sel) {
+    const bb = gm.bb, on = S.sim ? S.sim.clk : 0; body(c, bb, BODY, EDGE, sel);
+    const x = bb.x + 9, y = bb.y + bb.h / 2, w = bb.w - 18; g.beginPath(); g.moveTo(x, y + 6); g.lineTo(x + w * .25, y + 6); g.lineTo(x + w * .25, y - 6); g.lineTo(x + w * .6, y - 6); g.lineTo(x + w * .6, y + 6); g.lineTo(x + w, y + 6);
+    g.strokeStyle = on ? CL.on : '#a0a6ab'; g.lineWidth = 1.6; g.stroke(); caption(bb, c.props.label);
+  },
+  input(c, gm, sel, top) {
+    const bb = gm.bb, w = clampW(c.props.width); body(c, bb, '#33393a', EDGE, sel);
+    const v = top && S.sim ? S.sim.srcVal(c.id) >>> 0 : 0;
+    for (const cl of cellsOf(c, bb)) { const on = (v >>> cl.b) & 1; g.fillStyle = on ? '#1d6b3f' : '#232425'; g.fillRect(cl.x + 1, cl.y, cl.w - 2, cl.h);
+      if (cl.w > 9 && cl.h > 9) txt(on ? '1' : '0', cl.x + cl.w / 2, cl.y + cl.h / 2 + .5, Math.min(11, cl.w * .7), on ? '#b9ffd6' : '#7b8186', 'center', 700, MONO); }
+    txt(`${c.props.name}${w > 1 ? ` [${w}]` : ''}${w > 1 && top ? ` = ${v}` : ''}`, bb.x, bb.y - 7, 10, '#9fd8b4', 'left', 600);
+  },
+  output(c, gm, sel) {
+    const bb = gm.bb, w = clampW(c.props.width), n = netOf(c.id, 'in'), v = nval(n); body(c, bb, '#3a3632', EDGE, sel);
+    if (w <= 8) for (const cl of cellsOf(c, bb)) { const on = (v >>> cl.b) & 1; g.fillStyle = on ? '#c77a26' : '#262321'; g.fillRect(cl.x + 1, cl.y, cl.w - 2, cl.h); }
+    else txt('0x' + hex(v, w), bb.x + bb.w / 2, bb.y + bb.h / 2, 11, '#ffc28a', 'center', 400, MONO);
+    txt(`${c.props.name}${w > 1 ? ` [${w}]` : ''}${w > 1 ? ` = ${v}` : ''}`, bb.x + bb.w, bb.y - 7, 10, '#e8b48a', 'right', 600);
+  },
+  sw_no(c, gm, sel) { drawSwitch(c, gm, sel, 0); }, sw_nc(c, gm, sel) { drawSwitch(c, gm, sel, 1); },
+  led(c, gm, sel) {
+    const bb = gm.bb, n = netOf(c.id, 'in'), st = nstate(n), on = st === 'on', cx = bb.x + bb.w / 2, cy = bb.y + bb.h / 2, col = c.props.color || '#ff4d4d';
+    g.beginPath(); g.arc(cx, cy, 12, 0, 7); g.fillStyle = on ? col : mix(col, .14); g.fill(); g.lineWidth = sel ? 2 : 1; g.strokeStyle = sel ? CL.sel : st === 'x' ? CL.x : '#8a8f93'; g.stroke();
+    if (on) { g.beginPath(); g.arc(cx, cy, 15, 0, 7); g.strokeStyle = mix(col, .45); g.lineWidth = 2; g.stroke(); }
+    caption(bb, c.props.label);
+  },
+  busread(c, gm, sel) {
+    const bb = gm.bb, w = clampW(c.props.width), n = netOf(c.id, 'in'), v = nval(n), st = nstate(n); body(c, bb, '#202122', EDGE, sel);
+    const pad = 7, cw = (bb.w - pad * 2) / w;
+    for (let k = 0; k < w; k++) { const on = (v >>> (w - 1 - k)) & 1; g.fillStyle = on ? '#ff4b3e' : '#3a2826'; g.fillRect(bb.x + pad + k * cw + .8, bb.y + 7, cw - 1.6, 9); }
+    const label = st === 'z' ? 'Z' : st === 'x' ? 'SHORT' : `0x${hex(v, w)}  ${v}`;
+    txt(label, bb.x + bb.w / 2, bb.y + bb.h - 17, 12, st === 'x' ? CL.x : '#f0f0f0', 'center', 400, MONO);
+    if (bb.w >= 100) txt(v.toString(2).padStart(w, '0').replace(/(.{4})(?=.)/g, '$1 '), bb.x + bb.w / 2, bb.y + bb.h - 6.5, 8, '#8a9096', 'center', 400, MONO);
+    caption(bb, c.props.label);
+  },
+  split(c, gm, sel) { const bb = gm.bb; body(c, bb, '#333', EDGE, sel); g.fillStyle = '#8a8f93'; g.fillRect(bb.x + bb.w / 2 - 1.5, bb.y + 8, 3, bb.h - 16); if (S.view.z > .5) pinLabels(gm); },
+  merge(c, gm, sel) { DR.split(c, gm, sel); },
+  seg7(c, gm, sel) {
+    const bb = gm.bb; body(c, bb, '#141414', EDGE, sel); const col = c.props.color || '#ff3b3b';
+    let segs = 0, dp = 0;
+    if (c.props.mode === 'seg') { 'abcdefg'.split('').forEach((s, i) => { if (bit(netOf(c.id, s))) segs |= 1 << i; }); dp = bit(netOf(c.id, 'dp')); }
+    else { const n = netOf(c.id, 'v'); segs = nstate(n) === 'z' ? 0 : SEG_HEX[nval(n) & 15]; dp = bit(netOf(c.id, 'dp')); }
+    drawDigit(bb.x + 22, bb.y + 10, bb.w - 36, bb.h - 20, segs, dp, col);
+    if (S.view.z > .5) pinLabels(gm);
+  },
+  oled(c, gm, sel) {
+    const bb = gm.bb; body(c, bb, '#1a1a1a', EDGE, sel);
+    const size = Math.min(bb.w - 44, bb.h - 18), sx = bb.x + bb.w - size - 9, sy = bb.y + (bb.h - size) / 2;
+    g.fillStyle = '#000'; g.fillRect(sx - 2, sy - 2, size + 4, size + 4);
+    const st = RT.get(c.id); if (st && st.kind === 'oled') { const oc = oledCanvas(c, st); g.imageSmoothingEnabled = false; g.drawImage(oc, sx, sy, size, size); }
+    if (S.view.z > .45) pinLabels(gm);
+  },
+  rom(c, gm, sel) { memBox(c, gm, sel, 'ROM'); },
+  ram(c, gm, sel) { memBox(c, gm, sel, 'RAM'); },
+  note(c, gm, sel) {
+    const bb = gm.bb; if (sel) { g.setLineDash([3, 3]); g.strokeStyle = CL.sel; g.lineWidth = 1; g.strokeRect(bb.x, bb.y, bb.w, bb.h); g.setLineDash([]); }
+    String(c.props.text || '').split('\n').forEach((l, i) => txt(l, bb.x + 4, bb.y + 10 + i * 15, 11.5, i ? '#a6abb0' : '#d6d6d6', 'left', i ? 400 : 600));
+  },
+  chip(c, gm, sel) {
+    const bb = gm.bb, d = LIB.chips[c.props.chipId];
+    if (!d) { body(c, bb, '#3a2222', CL.x, sel); txt('missing chip', bb.x + bb.w / 2, bb.y + bb.h / 2, 10, CL.x); return; }
+    const m = d.circuit.meta, col = m.color || '#4f8cff';
+    body(c, bb, '#35383a', sel ? CL.sel : '#9aa0a5', sel);
+    g.fillStyle = mix(col, .35); g.fillRect(bb.x + 1, bb.y + 1, bb.w - 2, 14); g.fillStyle = col; g.fillRect(bb.x + 1, bb.y + 15, bb.w - 2, 1);
+    if (S.view.z > .3) { txt((m.icon ? m.icon + ' ' : '') + (m.name || 'Chip'), bb.x + bb.w / 2, bb.y + 8, 10, '#f2f2f2', 'center', 600); pinLabels(gm); }
+  },
+};
+function drawSwitch(c, gm, sel, nc) {
+  const bb = gm.bb; body(c, bb, BODY, EDGE, sel);
+  const pi = gm.pm.get('in'), po = gm.pm.get('out'), pc = gm.pm.get('ctrl');
+  const ctrl = bit(netOf(c.id, 'ctrl')), on = ctrl ^ nc, ins = nstate(netOf(c.id, 'in'));
+  const A = { x: pi.wx - pi.nx * 8, y: pi.wy - pi.ny * 8 }, B = { x: po.wx - po.nx * 8, y: po.wy - po.ny * 8 };
+  const col = on ? (ins === 'on' || ins === 'bus' ? CL.on : ins === 'x' ? CL.x : '#c8cdd1') : '#c8cdd1';
+  g.strokeStyle = '#8a8f93'; g.lineWidth = 1.5;
+  g.beginPath(); g.moveTo(pi.wx, pi.wy); g.lineTo(A.x, A.y); g.moveTo(B.x, B.y); g.lineTo(po.wx, po.wy); g.stroke();
+  let E = B; if (!on) { const dx = B.x - A.x, dy = B.y - A.y, a = -0.55 * (pc ? Math.sign(pc.nx * dy - pc.ny * dx) || 1 : 1); E = { x: A.x + dx * Math.cos(a) - dy * Math.sin(a), y: A.y + dx * Math.sin(a) + dy * Math.cos(a) }; }
+  g.strokeStyle = col; g.lineWidth = 2; g.beginPath(); g.moveTo(A.x, A.y); g.lineTo(E.x, E.y); g.stroke();
+  g.fillStyle = '#d8dcdf'; for (const p of [A, B]) g.fillRect(p.x - 1.8, p.y - 1.8, 3.6, 3.6);
+  if (pc) { const mx = (A.x + E.x) / 2, my = (A.y + E.y) / 2; g.setLineDash([2, 2]); g.strokeStyle = ctrl ? '#00e67699' : '#8a8f9399'; g.lineWidth = 1; g.beginPath(); g.moveTo(pc.wx - pc.nx * 4, pc.wy - pc.ny * 4); g.lineTo(mx, my); g.stroke(); g.setLineDash([]); }
+  if (S.view.z > .55) txt(nc ? 'NC' : 'NO', bb.x + bb.w / 2, (pc && pc.ny > 0) || !pc ? bb.y + 7 : bb.y + bb.h - 7, 7.5, nc ? '#e6a15a' : '#7fb6ff', 'center', 700);
+}
+function drawDigit(x, y, w, h, segs, dp, col) {
+  const t = Math.max(3, w * 0.16), off = mix(col, .08), H = h / 2;
+  const S7 = [[t * .6, 0, w - t * 1.2, t], [w - t, t * .6, t, H - t * .9], [w - t, H + t * .3, t, H - t * .9], [t * .6, h - t, w - t * 1.2, t], [0, H + t * .3, t, H - t * .9], [0, t * .6, t, H - t * .9], [t * .6, H - t / 2, w - t * 1.2, t]];
+  S7.forEach((s, i) => { g.fillStyle = (segs >> i) & 1 ? col : off; g.fillRect(x + s[0], y + s[1], s[2], s[3]); });
+  g.fillStyle = dp ? col : off; g.fillRect(x + w + t * .4, y + h - t, t, t);
+}
+function memBox(c, gm, sel, label) {
+  const bb = gm.bb; body(c, bb, BODY, EDGE, sel); const ab = Math.min(16, clampW(c.props.addrBits)), db = clampW(c.props.dataBits);
+  txt(label, bb.x + bb.w / 2, bb.y + 12, 11, TXT, 'center', 700);
+  txt(`${1 << ab}x${db}`, bb.x + bb.w / 2, bb.y + 25, 9.5, SUB, 'center', 400, MONO);
+  if (S.cmp && bb.h > 50) { const a = nval(netOf(c.id, 'a')), d = nval(netOf(c.id, 'd')); txt(`@${hex(a, ab)}=${hex(d, db)}`, bb.x + bb.w / 2, bb.y + bb.h - 12, 9, SUB, 'center', 400, MONO); }
+  if (S.view.z > .45) pinLabels(gm);
+}
+const OC = new Map();
+function oledCanvas(c, st) {
+  let o = OC.get(c.id);
+  if (!o || o.res !== st.res) { const cnv = document.createElement('canvas'); cnv.width = cnv.height = st.res; o = { cnv, x: cnv.getContext('2d'), res: st.res, img: null, mode: '' }; o.img = o.x.createImageData(st.res, st.res); OC.set(c.id, o); st.dirty = true; }
+  const mode = c.props.color || 'mono';
+  if (st.dirty || o.mode !== mode || o.st !== st) {
+    const d = o.img.data, b = st.buf;
+    for (let i = 0; i < b.length; i++) {
+      const v = b[i]; let r, gg, bl;
+      if (mode === 'gray') { r = gg = bl = (v & 15) * 17; }
+      else if (mode === 'rgb') { r = ((v >> 5) & 7) * 36; gg = ((v >> 2) & 7) * 36; bl = (v & 3) * 85; }
+      else if (v & 1) { r = 120; gg = 235; bl = 255; } else { r = 6; gg = 10; bl = 14; }
+      d[i * 4] = r; d[i * 4 + 1] = gg; d[i * 4 + 2] = bl; d[i * 4 + 3] = 255;
+    }
+    o.x.putImageData(o.img, 0, 0); st.dirty = false; o.mode = mode; o.st = st;
+  }
+  return o.cnv;
+}
+
+/* ---------------- main draw ---------------- */
+function viewRect() { const W = cv.width / DPR, H = cv.height / DPR, z = S.view.z; return { x: S.view.x, y: S.view.y, w: W / z, h: H / z }; }
+const isect = (a, b, m) => a.x - m < b.x + b.w && a.x + a.w + m > b.x && a.y - m < b.y + b.h && a.y + a.h + m > b.y;
+let drawnComps = 0;
+function draw() {
+  const W = cv.width, H = cv.height, z = S.view.z * DPR;
+  g.setTransform(1, 0, 0, 1, 0, 0); g.fillStyle = '#2b2b2b'; g.fillRect(0, 0, W, H);
+  g.setTransform(z, 0, 0, z, -S.view.x * z, -S.view.y * z);
+  g.lineJoin = 'miter'; g.lineCap = 'square';
+  const vr = viewRect();
+  if (S.grid && S.view.z * GRID >= 8) {
+    const x0 = Math.floor(vr.x / GRID) * GRID, y0 = Math.floor(vr.y / GRID) * GRID, r = .9 / S.view.z;
+    g.fillStyle = '#353535';
+    for (let x = x0; x < vr.x + vr.w; x += GRID) for (let y = y0; y < vr.y + vr.h; y += GRID) g.fillRect(x - r, y - r, r * 2, r * 2);
+  }
+  const circ = C();
+  const labels = [];
+  for (const w of circ.wires) {
+    const wg = wGeom(w); if (!wg || !isect(wg.bb, vr, 10)) continue;
+    const n = netOf(w.a.c, w.a.p), st = wg.bad ? 'bad' : nstate(n), p = wg.pts;
+    g.beginPath(); g.moveTo(p[0].x, p[0].y); for (let i = 1; i < p.length; i++) g.lineTo(p[i].x, p[i].y);
+    if (S.selW.has(w.id)) { g.strokeStyle = '#0078d7aa'; g.lineWidth = wg.bus ? 8 : 6; g.stroke(); }
+    g.strokeStyle = CL[st] || CL.none; g.lineWidth = wg.bus ? 3.2 : 1.8;
+    if (st === 'z' || st === 'bad') g.setLineDash([4, 3]);
+    g.stroke(); g.setLineDash([]);
+    if (wg.bus && S.view.z > .55 && st !== 'bad' && S.sim) {
+      let best = 0, bi = 0; for (let i = 1; i < p.length; i++) { const l = Math.abs(p[i].x - p[i - 1].x) + Math.abs(p[i].y - p[i - 1].y); if (l > best) { best = l; bi = i; } }
+      if (best > 46) labels.push({ x: (p[bi].x + p[bi - 1].x) / 2, y: (p[bi].y + p[bi - 1].y) / 2, t: st === 'z' ? 'Z' : st === 'x' ? '!!' : '0x' + hex(nval(n), S.sim.nw[n]) });
+    }
+  }
+  for (const l of labels) { g.font = `400 9.5px ${MONO}`; const tw = g.measureText(l.t).width + 6; g.fillStyle = '#1e1e1e'; g.fillRect(l.x - tw / 2, l.y - 7, tw, 13); g.strokeStyle = '#3d9df2'; g.lineWidth = 1; g.strokeRect(l.x - tw / 2 + .5, l.y - 6.5, tw - 1, 12); txt(l.t, l.x, l.y, 9.5, '#9ccfff', 'center', 400, MONO); }
+  // junction dots where 3+ wire ends meet a pin
+  drawnComps = 0; const pc = pinConn(), showPins = S.view.z > .3;
+  for (const c of circ.components) {
+    const gm = G(c); if (!isect(gm.bb, vr, 30)) continue; drawnComps++;
+    const f = DR[c.type]; if (f) f(c, gm, S.sel.has(c.id), true);
+    if (showPins) for (const p of gm.pins) {
+      const st = nstate(netOf(c.id, p.n)), col = CL[st] || CL.none, conn = pc.get(c.id + '|' + p.n);
+      const s = p.w > 1 ? 3.4 : 2.6;
+      if (conn) { g.fillStyle = col; g.fillRect(p.wx - s, p.wy - s, s * 2, s * 2); if (conn >= 2) { g.fillRect(p.wx - s - 1, p.wy - s - 1, s * 2 + 2, s * 2 + 2); } }
+      else { g.fillStyle = '#2b2b2b'; g.fillRect(p.wx - s, p.wy - s, s * 2, s * 2); g.lineWidth = 1; g.strokeStyle = col; g.strokeRect(p.wx - s + .5, p.wy - s + .5, s * 2 - 1, s * 2 - 1); }
+    }
+  }
+  const hv = S.hoverPin; if (hv && !S.place) { g.strokeStyle = '#ffffff'; g.lineWidth = 1; g.strokeRect(hv.wx - 6.5, hv.wy - 6.5, 13, 13); }
+  if (S.wiring) {
+    const f = S.wiring.from, end = S.hoverPin && S.hoverPin !== f ? { x: S.hoverPin.wx, y: S.hoverPin.wy } : S.wiring.cur, en = S.hoverPin ? { x: S.hoverPin.nx, y: S.hoverPin.ny } : { x: 0, y: 0 };
+    const pts = route({ x: f.wx, y: f.wy }, { x: f.nx, y: f.ny }, end, en, S.wiring.pts);
+    g.beginPath(); g.moveTo(pts[0].x, pts[0].y); for (const p of pts) g.lineTo(p.x, p.y); g.strokeStyle = '#4da3ff'; g.lineWidth = 1.5; g.setLineDash([5, 3]); g.stroke(); g.setLineDash([]);
+  }
+  if (S.box) { const b = normBox(S.box); g.fillStyle = '#0078d722'; g.fillRect(b.x, b.y, b.w, b.h); g.strokeStyle = '#0078d7'; g.lineWidth = 1 / S.view.z; g.setLineDash([4 / S.view.z, 3 / S.view.z]); g.strokeRect(b.x, b.y, b.w, b.h); g.setLineDash([]); }
+  if (S.place && S.overCanvas) {
+    const gc = ghostComp(S.place, S.mouse); const gm = geomOf(gc); g.globalAlpha = .55; const f = DR[gc.type]; if (f) f(gc, gm, true, false);
+    for (const p of gm.pins) { g.fillStyle = '#4da3ff'; g.fillRect(p.wx - 2.5, p.wy - 2.5, 5, 5); } g.globalAlpha = 1;
+  }
+  $('#sbZoom').textContent = Math.round(S.view.z * 100) + '%';
+  const zi = $('#tbZoom'); if (zi && document.activeElement !== zi) zi.value = Math.round(S.view.z * 100) + '%';
+}
+function normBox(b) { return { x: Math.min(b.a.x, b.b.x), y: Math.min(b.a.y, b.b.y), w: Math.abs(b.a.x - b.b.x), h: Math.abs(b.a.y - b.b.y) }; }
+function ghostComp(spec, p) {
+  const c = { id: '__ghost', type: spec.type, x: 0, y: 0, rot: 0, flip: false, props: Object.assign(clone(T[spec.type].def || {}), spec.chipId ? { chipId: spec.chipId } : {}) };
+  const gm = geomOf(c); c.x = sn(p.x - gm.bb.w / 2); c.y = sn(p.y - gm.bb.h / 2); return c;
+}
+
+/* ---------------- hit testing ---------------- */
+function toWorld(e) { const r = cv.getBoundingClientRect(); return { x: (e.clientX - r.left) / S.view.z + S.view.x, y: (e.clientY - r.top) / S.view.z + S.view.y }; }
+function pinAt(p) {
+  const r = Math.max(7, 9 / S.view.z), cs = C().components;
+  for (let i = cs.length - 1; i >= 0; i--) { const c = cs[i], gm = G(c); if (!isect(gm.bb, { x: p.x, y: p.y, w: 0, h: 0 }, r)) continue;
+    for (const q of gm.pins) if (Math.abs(q.wx - p.x) <= r && Math.abs(q.wy - p.y) <= r) return Object.assign({ c }, q); }
+  return null;
+}
+function compAt(p) { const cs = C().components; for (let i = cs.length - 1; i >= 0; i--) { const b = G(cs[i]).bb; if (p.x >= b.x && p.x <= b.x + b.w && p.y >= b.y && p.y <= b.y + b.h) return cs[i]; } return null; }
+function segDist(p, a, b) { const dx = b.x - a.x, dy = b.y - a.y, l = dx * dx + dy * dy; let t = l ? ((p.x - a.x) * dx + (p.y - a.y) * dy) / l : 0; t = Math.max(0, Math.min(1, t)); return Math.hypot(p.x - a.x - t * dx, p.y - a.y - t * dy); }
+function wireAt(p) { const tol = Math.max(3, 6 / S.view.z), ws = C().wires; for (let i = ws.length - 1; i >= 0; i--) { const wg = wGeom(ws[i]); if (!wg || !isect(wg.bb, { x: p.x, y: p.y, w: 0, h: 0 }, tol)) continue; for (let k = 1; k < wg.pts.length; k++) if (segDist(p, wg.pts[k - 1], wg.pts[k]) <= tol) return ws[i]; } return null; }
+
+/* ---------------- editing operations ---------------- */
+function canUseChip(id) {
+  const open = S.levels.filter(l => l.chipId).map(l => l.chipId); if (!open.length) return true;
+  const dep = chipDeps(id); return !open.some(o => o === id || dep.has(o));
+}
+function portNames(except) { const s = new Set(); for (const c of C().components) if ((c.type === 'input' || c.type === 'output') && c !== except) s.add(String(c.props.name)); return s; }
+function nextName(type) {
+  const used = portNames(), base = type === 'input' ? 'ABCDEFGHIJKLMNOP'.split('') : ['Y', 'Z', 'Q', 'R', 'S', 'T', 'U', 'V', 'W'];
+  for (const b of base) if (!used.has(b)) return b; let i = 1; const p = type === 'input' ? 'In' : 'Out'; while (used.has(p + i)) i++; return p + i;
+}
+function placeAt(spec, p) {
+  if (spec.type === 'chip') { if (!LIB.chips[spec.chipId]) return; if (!canUseChip(spec.chipId)) { toast("A chip can't contain itself (directly or through another chip).", true); return; } }
+  commit();
+  const c = ghostComp(spec, p); c.id = uid('c');
+  if (c.type === 'input' || c.type === 'output') c.props.name = nextName(c.type);
+  C().components.push(c); S.sel = new Set([c.id]); S.selW.clear(); changed();
+}
+function addWire(from, to, pts) {
+  if (from.c.id === to.c.id && from.n === to.n) return;
+  if (from.w !== to.w) { toast(`Bit width mismatch: ${from.w} vs ${to.w}. Use a splitter/merger to convert.`, true); return; }
+  const dup = C().wires.some(w => (w.a.c === from.c.id && w.a.p === from.n && w.b.c === to.c.id && w.b.p === to.n) || (w.b.c === from.c.id && w.b.p === from.n && w.a.c === to.c.id && w.a.p === to.n));
+  if (dup) return;
+  commit(); const w = { id: uid('w'), a: { c: from.c.id, p: from.n }, b: { c: to.c.id, p: to.n } }; if (pts && pts.length) w.pts = pts.map(q => ({ x: q.x, y: q.y }));
+  C().wires.push(w); changed();
+}
+function delSel() {
+  if (!S.sel.size && !S.selW.size) return; commit(); const c = C();
+  c.components = c.components.filter(x => !S.sel.has(x.id));
+  c.wires = c.wires.filter(w => !S.selW.has(w.id) && !S.sel.has(w.a.c) && !S.sel.has(w.b.c));
+  for (const id of S.sel) { RT.delete(id); OC.delete(id); }
+  S.traces = S.traces.filter(t => !S.sel.has(t.c));
+  S.sel.clear(); S.selW.clear(); changed(); sizeCanvases();
+}
+function copySel() {
+  if (!S.sel.size) return false; const c = C();
+  S.clip = { comps: clone(c.components.filter(x => S.sel.has(x.id))), wires: clone(c.wires.filter(w => S.sel.has(w.a.c) && S.sel.has(w.b.c))) }; S.pasteN = 0;
+  toast(`Copied ${S.clip.comps.length} part(s), ${S.clip.wires.length} wire(s)`); return true;
+}
+function paste() {
+  if (!S.clip) return; const cl = S.clip; if (cl.comps.some(x => x.type === 'chip' && !canUseChip(x.props.chipId))) { toast("Can't paste a chip into itself.", true); return; }
+  commit(); S.pasteN++; const d = GRID * 2 * S.pasteN, map = {}, c = C(); S.sel.clear(); S.selW.clear();
+  for (const x of cl.comps) { const n = clone(x); n.id = uid('c'); map[x.id] = n.id; n.x += d; n.y += d; if ((n.type === 'input' || n.type === 'output') && portNames().has(String(n.props.name))) n.props.name = nextName(n.type); c.components.push(n); S.sel.add(n.id); }
+  for (const w of cl.wires) { const n = clone(w); n.id = uid('w'); n.a.c = map[w.a.c]; n.b.c = map[w.b.c]; if (n.pts) n.pts.forEach(p => { p.x += d; p.y += d; }); c.wires.push(n); }
+  changed();
+}
+function transformSel(fn) { if (!S.sel.size) return; commit(); for (const c of C().components) if (S.sel.has(c.id)) fn(c); changed(); }
+function selectAll() { for (const c of C().components) S.sel.add(c.id); for (const w of C().wires) S.selW.add(w.id); renderInspector(); S.dirty = true; }
+function unbendSel() { const ws = C().wires.filter(w => S.selW.has(w.id) && w.pts); if (!ws.length) { toast('Select wires with bend points first.'); return; } commit(); for (const w of ws) delete w.pts; changed(); }
+function delWiresSel() { if (!S.selW.size) { toast('No wires selected.'); return; } const keep = S.sel; S.sel = new Set(); delSel(); S.sel = keep; }
+function fit() {
+  const cs = C().components; const W = cv.width / DPR, H = cv.height / DPR;
+  if (!cs.length) { S.view = { x: -W / 2, y: -H / 2, z: 1 }; S.dirty = true; return; }
+  let x0 = 1e9, y0 = 1e9, x1 = -1e9, y1 = -1e9; for (const c of cs) { const b = G(c).bb; x0 = Math.min(x0, b.x); y0 = Math.min(y0, b.y - 14); x1 = Math.max(x1, b.x + b.w); y1 = Math.max(y1, b.y + b.h); }
+  for (const w of C().wires) { const wg = wGeom(w); if (wg) { x0 = Math.min(x0, wg.bb.x); y0 = Math.min(y0, wg.bb.y); x1 = Math.max(x1, wg.bb.x + wg.bb.w); y1 = Math.max(y1, wg.bb.y + wg.bb.h); } }
+  const pad = 50, z = Math.max(0.12, Math.min(1.6, Math.min((W - pad * 2) / (x1 - x0 || 1), (H - pad * 2) / (y1 - y0 || 1))));
+  S.view = { z, x: (x0 + x1) / 2 - W / 2 / z, y: (y0 + y1) / 2 - H / 2 / z }; S.dirty = true;
+}
+function zoomAt(f, sx, sy) { const z0 = S.view.z, z = Math.max(0.1, Math.min(5, z0 * f)); const wx = sx / z0 + S.view.x, wy = sy / z0 + S.view.y; S.view.z = z; S.view.x = wx - sx / z; S.view.y = wy - sy / z; S.dirty = true; }
+const zoomC = f => zoomAt(f, cv.width / DPR / 2, cv.height / DPR / 2);
+
+/* ---------------- levels (editing chips in place) ---------------- */
+function openChip(id) {
+  const d = LIB.chips[id]; if (!d) return;
+  if (S.levels.some(l => l.chipId === id)) { toast('That chip is already open.'); return; }
+  L().view = Object.assign({}, S.view); L().sel = [...S.sel];
+  S.levels.push({ chipId: id, circ: clone(d.circuit), undo: [], redo: [], view: null, edited: false });
+  S.sel.clear(); S.selW.clear(); S.traces = []; S.place = null; S.wiring = null; S.need = true; bump(); fit(); renderAll(); sizeCanvases();
+}
+function saveChip(quiet) {
+  const l = L(); if (!l.chipId) return; const d = LIB.chips[l.chipId]; if (!d) return;
+  d.circuit = clone(l.circ); d.version++; invalidate(); l.edited = false; persist(); renderPalette(); renderCrumbs(); if (!quiet) toast(`Saved chip "${d.circuit.meta.name}". All instances updated.`);
+}
+function closeTo(level, save) {
+  while (S.levels.length - 1 > level) { if (save && L().edited) saveChip(true); S.levels.pop(); }
+  S.sel = new Set(L().sel || []); S.selW.clear(); S.traces = []; S.wiring = null; S.place = null;
+  if (L().view) S.view = Object.assign({}, L().view); S.need = true; bump(); renderAll(); sizeCanvases();
+}
+function saveToLibrary() {
+  if (L().chipId) { saveChip(); return; }
+  const c = C(); const ins = c.components.filter(x => x.type === 'input').length, outs = c.components.filter(x => x.type === 'output').length;
+  if (!ins && !outs) { toast('Add at least one Input or Output port first. Ports become the chip pins.', true); return; }
+  const name = (c.meta.name || 'Untitled').trim(); let d = Object.values(LIB.chips).find(x => x.circuit.meta.name === name);
+  const used = circDeps(c); if (d && (used.has(d.id) || S.levels.some(l => l.chipId === d.id))) d = null;
+  if (d) { d.circuit = clone(c); d.version++; toast(`Updated "${name}" in library.`); }
+  else { const id = uid('chip'); LIB.chips[id] = { id, version: 1, circuit: clone(c) }; toast(`Saved "${name}" to library (${ins} in, ${outs} out).`); }
+  invalidate(); persist(); renderPalette(); S.need = true;
+}
+function saveAsNew() { const c = C(), id = uid('chip'), cc = clone(c); cc.meta.name = (cc.meta.name || 'Chip') + ' copy'; LIB.chips[id] = { id, version: 1, circuit: cc }; invalidate(); persist(); renderPalette(); toast(`Saved "${cc.meta.name}" to library.`); }
+
+/* ---------------- pointer interaction ---------------- */
+let M0 = null;
+function interact(c, p, phase) {
+  if (c.type === 'toggle' && phase === 'click') { c.props.value = (c.props.value & 1) ^ 1; setSrc(c, c.props.value); persist(); return true; }
+  if (c.type === 'button') { if (phase === 'down') { setSrc(c, 1); return 'button'; } if (phase === 'up') { setSrc(c, 0); return true; } }
+  if (c.type === 'input' && phase === 'click') {
+    const cell = cellsOf(c, G(c).bb).find(r => p.x >= r.x && p.x <= r.x + r.w && p.y >= r.y - 4 && p.y <= r.y + r.h + 4);
+    if (cell) { const w = clampW(c.props.width); c.props.value = ((c.props.value | 0) ^ (1 << cell.b)) & M(w); setSrc(c, c.props.value); persist(); renderInspectorLive(true); return true; }
+  }
+  return false;
+}
+cv.addEventListener('contextmenu', e => e.preventDefault());
+cv.addEventListener('pointerdown', e => {
+  cv.focus(); closeMenus(); const p = toWorld(e); S.mouse = p;
+  if (e.button === 2 && (S.wiring || S.place)) { S.wiring = null; S.place = null; renderPalette(); hint(); S.dirty = true; return; }
+  cv.setPointerCapture(e.pointerId);
+  if (e.button === 1 || e.button === 2 || (e.button === 0 && S.space)) { M0 = { mode: 'pan', btn: e.button, sx: e.clientX, sy: e.clientY, vx: S.view.x, vy: S.view.y }; return; }
+  if (e.button !== 0) return;
+  if (S.place) { placeAt(S.place, p); if (!e.shiftKey) { S.place = null; renderPalette(); hint(); } return; }
+  const pin = pinAt(p);
+  if (S.wiring) { if (pin) { addWire(S.wiring.from, pin, S.wiring.pts); S.wiring = null; hint(); } else S.wiring.pts.push({ x: sn(p.x), y: sn(p.y) }); S.dirty = true; return; }
+  if (pin) { S.wiring = { from: pin, pts: [], cur: p }; M0 = { mode: 'wire', sx: e.clientX, sy: e.clientY }; hint(); S.dirty = true; return; }
+  const c = compAt(p);
+  if (c) {
+    const act = interact(c, p, 'down');
+    if (!S.sel.has(c.id)) { if (!e.shiftKey) { S.sel.clear(); S.selW.clear(); } S.sel.add(c.id); } else if (e.shiftKey) S.sel.delete(c.id);
+    const orig = new Map(); for (const x of C().components) if (S.sel.has(x.id)) orig.set(x.id, { x: x.x, y: x.y });
+    const wpts = C().wires.filter(w => w.pts && S.sel.has(w.a.c) && S.sel.has(w.b.c)).map(w => ({ w, o: clone(w.pts) }));
+    M0 = { mode: 'move', start: p, moved: false, comp: c, act, snap: snapshot(), orig, wpts, sx: e.clientX, sy: e.clientY };
+    renderInspector(); S.dirty = true; return;
+  }
+  const w = wireAt(p);
+  if (w) { if (!e.shiftKey) { S.sel.clear(); S.selW.clear(); } S.selW.add(w.id); renderInspector(); S.dirty = true; return; }
+  if (!e.shiftKey) { S.sel.clear(); S.selW.clear(); renderInspector(); }
+  M0 = { mode: 'box' }; S.box = { a: p, b: p }; S.dirty = true;
+});
+cv.addEventListener('pointermove', e => {
+  const p = toWorld(e); S.mouse = p; S.overCanvas = true;
+  $('#sbXY').textContent = `${Math.round(p.x / GRID)}, ${Math.round(p.y / GRID)}`;
+  if (M0 && M0.mode === 'pan') { S.view.x = M0.vx - (e.clientX - M0.sx) / S.view.z; S.view.y = M0.vy - (e.clientY - M0.sy) / S.view.z; S.dirty = true; if (Math.hypot(e.clientX - M0.sx, e.clientY - M0.sy) > 4) cv.style.cursor = 'move'; return; }
+  if (M0 && M0.mode === 'move') {
+    if (!M0.moved && Math.hypot(e.clientX - M0.sx, e.clientY - M0.sy) < 4) return;
+    if (M0.act === 'button') { setSrc(M0.comp, 0); M0.act = null; }
+    M0.moved = true; const dx = S.snap ? sn(p.x - M0.start.x) : p.x - M0.start.x, dy = S.snap ? sn(p.y - M0.start.y) : p.y - M0.start.y;
+    for (const c of C().components) { const o = M0.orig.get(c.id); if (o) { c.x = Math.round(o.x + dx); c.y = Math.round(o.y + dy); } }
+    for (const { w, o } of M0.wpts) w.pts = o.map(q => ({ x: Math.round(q.x + dx), y: Math.round(q.y + dy) }));
+    bump(); return;
+  }
+  if (M0 && M0.mode === 'box') { S.box.b = p; S.dirty = true; return; }
+  const hp = pinAt(p); if (hp !== S.hoverPin && (!hp || !S.hoverPin || hp.c !== S.hoverPin.c || hp.n !== S.hoverPin.n)) { S.hoverPin = hp; S.dirty = true; }
+  if (S.wiring) { S.wiring.cur = p; S.dirty = true; }
+  if (S.place) S.dirty = true;
+  tip(e, p, hp);
+  cv.style.cursor = S.space ? 'move' : hp ? 'crosshair' : S.place ? 'copy' : 'default';
+});
+cv.addEventListener('pointerleave', () => { S.overCanvas = false; $('#tip').style.display = 'none'; S.dirty = true; });
+cv.addEventListener('pointerup', e => {
+  const p = toWorld(e); const m = M0; M0 = null; cv.style.cursor = 'default';
+  if (!m) return;
+  if (m.mode === 'pan') { if (m.btn === 2 && Math.hypot(e.clientX - m.sx, e.clientY - m.sy) < 4) canvasMenu(e, p); return; }
+  if (m.mode === 'move') {
+    if (m.moved) { commit(m.snap); persist(); renderInspector(); }
+    else { if (m.act === 'button') interact(m.comp, p, 'up'); else interact(m.comp, p, 'click'); }
+  } else if (m.mode === 'box') {
+    const b = normBox(S.box); S.box = null;
+    if (b.w > 2 || b.h > 2) { for (const c of C().components) if (isect(G(c).bb, b, 0)) S.sel.add(c.id); for (const w of C().wires) { const wg = wGeom(w); if (wg && S.sel.has(w.a.c) && S.sel.has(w.b.c)) S.selW.add(w.id); } }
+    renderInspector(); S.dirty = true;
+  } else if (m.mode === 'wire' && S.wiring) {
+    const moved = Math.hypot(e.clientX - m.sx, e.clientY - m.sy) > 6;
+    if (moved) { const pin = pinAt(p); if (pin && !(pin.c === S.wiring.from.c && pin.n === S.wiring.from.n)) { addWire(S.wiring.from, pin, S.wiring.pts); S.wiring = null; hint(); } else if (!pin) S.wiring.pts.push({ x: sn(p.x), y: sn(p.y) }); }
+    S.dirty = true;
+  }
+});
+cv.addEventListener('dblclick', e => { const c = compAt(toWorld(e)); if (c && c.type === 'chip') openChip(c.props.chipId); else if (c && c.type === 'note') { const t = document.querySelector('#insBody textarea'); if (t) t.focus(); } });
+cv.addEventListener('wheel', e => {
+  e.preventDefault(); const r = cv.getBoundingClientRect(), sx = e.clientX - r.left, sy = e.clientY - r.top;
+  const k = e.deltaMode === 1 ? 33 : 1, dx = e.deltaX * k, dy = e.deltaY * k;
+  if (e.ctrlKey || (dx === 0 && Math.abs(dy) >= 40) || e.deltaMode === 1) zoomAt(Math.exp(-dy * (e.ctrlKey ? 0.01 : 0.0015)), sx, sy);
+  else { S.view.x += dx / S.view.z; S.view.y += dy / S.view.z; S.dirty = true; }
+}, { passive: false });
+cv.addEventListener('dragover', e => { e.preventDefault(); S.mouse = toWorld(e); S.overCanvas = true; S.dirty = true; });
+cv.addEventListener('drop', e => { e.preventDefault(); try { const spec = JSON.parse(e.dataTransfer.getData('text/plain')); if (spec && spec.type) placeAt(spec, toWorld(e)); } catch (_) {} S.place = null; renderPalette(); hint(); });
+function tip(e, p, hp) {
+  const t = $('#tip'); let s = null;
+  if (hp && !S.place) { const n = netOf(hp.c.id, hp.n); s = `${hp.label || hp.n || 'pin'}  ${hp.w}-bit ${hp.dir}\n${valText(n, true)}`; }
+  else if (!S.place && !S.wiring) { const w = wireAt(p); if (w) { const wg = wGeom(w); s = wg && wg.bad ? 'width mismatch: not connected' : valText(netOf(w.a.c, w.a.p), true); } }
+  if (!s) { t.style.display = 'none'; return; }
+  const r = $('#wrap').getBoundingClientRect(); t.textContent = s; t.style.display = 'block'; t.style.left = (e.clientX - r.left + 14) + 'px'; t.style.top = (e.clientY - r.top + 14) + 'px';
+}
+function canvasMenu(e, p) {
+  const c = compAt(p), w = c ? null : wireAt(p);
+  if (c && !S.sel.has(c.id)) { S.sel = new Set([c.id]); S.selW.clear(); renderInspector(); S.dirty = true; }
+  if (w && !S.selW.has(w.id)) { S.sel.clear(); S.selW = new Set([w.id]); renderInspector(); S.dirty = true; }
+  let items;
+  if (c) items = [
+    ...(c.type === 'chip' ? [{ l: 'Open chip', k: 'Enter', f: () => openChip(c.props.chipId) }, '-'] : []),
+    { l: 'Cut', k: 'Ctrl+X', f: () => { if (copySel()) delSel(); } }, { l: 'Copy', k: 'Ctrl+C', f: copySel }, { l: 'Duplicate', k: 'Ctrl+D', f: () => { if (copySel()) paste(); } }, '-',
+    { l: 'Rotate clockwise', k: 'R', f: () => transformSel(x => { x.rot = ((x.rot | 0) + 1) & 3; }) }, { l: 'Rotate counter-clockwise', k: 'Shift+R', f: () => transformSel(x => { x.rot = ((x.rot | 0) + 3) & 3; }) }, { l: 'Flip horizontal', k: 'F', f: () => transformSel(x => { x.flip = !x.flip; }) }, '-',
+    { l: 'Trace pins in analyzer', k: 'T', f: traceSel }, '-', { l: 'Delete', k: 'Del', f: delSel }];
+  else if (w) items = [{ l: 'Trace in analyzer', k: 'T', f: traceSel }, { l: 'Remove bend points', f: unbendSel, dis: !w.pts }, '-', { l: 'Delete wire', k: 'Del', f: delSel }];
+  else items = [{ l: 'Paste', k: 'Ctrl+V', f: paste, dis: !S.clip }, { l: 'Select all', k: 'Ctrl+A', f: selectAll }, '-', { l: 'Zoom to fit', k: 'Home', f: fit }, { l: 'Show grid', chk: S.grid, f: () => { S.grid = !S.grid; S.dirty = true; persist(); } }];
+  showMenu(items, e.clientX, e.clientY);
+}
+
+/* ---------------- keyboard ---------------- */
+window.addEventListener('keydown', e => {
+  if (e.key === 'Escape' && ($('#dd').classList.contains('show') || $('#dlgWrap').classList.contains('show'))) { closeMenus(); closeDlg(); return; }
+  if ((e.ctrlKey || e.metaKey) && (e.key === 's' || e.key === 'o')) { e.preventDefault(); if (e.target.blur) e.target.blur(); if (e.key === 's') saveToLibrary(); else $('#file').click(); return; }
+  if (e.target.matches && e.target.matches('input,textarea,select')) return;
+  if ($('#dlgWrap').classList.contains('show')) return;
+  const k = e.key.toLowerCase(), mod = e.ctrlKey || e.metaKey;
+  if (mod && k === 'z' && !e.shiftKey) { e.preventDefault(); undo(); }
+  else if (mod && (k === 'y' || (k === 'z' && e.shiftKey))) { e.preventDefault(); redo(); }
+  else if (mod && k === 'c') { if (copySel()) e.preventDefault(); }
+  else if (mod && k === 'x') { if (copySel()) { e.preventDefault(); delSel(); } }
+  else if (mod && k === 'v') { e.preventDefault(); paste(); }
+  else if (mod && k === 'd') { e.preventDefault(); if (copySel()) paste(); }
+  else if (mod && k === 'a') { e.preventDefault(); selectAll(); }
+  else if (mod && k === 's') { e.preventDefault(); saveToLibrary(); }
+  else if (mod && k === 'o') { e.preventDefault(); $('#file').click(); }
+  else if (mod) return;
+  else if (k === 'delete' || k === 'backspace') { e.preventDefault(); delSel(); }
+  else if (k === 'escape') { S.wiring = null; S.place = null; S.box = null; M0 = null; renderPalette(); hint(); S.dirty = true; }
+  else if (k === 'r') transformSel(c => { c.rot = ((c.rot | 0) + (e.shiftKey ? 3 : 1)) & 3; });
+  else if (k === 'f') transformSel(c => { c.flip = !c.flip; });
+  else if (k === 't') traceSel();
+  else if (k === 'p') toggleRun();
+  else if (k === '.') step();
+  else if (k === 'g') { S.snap = !S.snap; renderToolbar(); persist(); }
+  else if (k === 'home' || k === '0') fit();
+  else if (k === '=' || k === '+') zoomC(1.2);
+  else if (k === '-') zoomC(1 / 1.2);
+  else if (k === ' ') { e.preventDefault(); S.space = true; cv.style.cursor = 'move'; }
+  else if (k === 'enter' && S.sel.size === 1) { const c = cmap().get([...S.sel][0]); if (c && c.type === 'chip') openChip(c.props.chipId); }
+});
+window.addEventListener('keyup', e => { if (e.key === ' ') { S.space = false; cv.style.cursor = 'default'; } });
+
+/* ---------------- menus ---------------- */
+let menuOpen = null;
+function showMenu(items, x, y, owner) {
+  const dd = $('#dd');
+  dd.innerHTML = items.map((it, i) => {
+    if (it === '-') return '<div class="sep"></div>';
+    if (it.lbl) return `<div class="lbl">${esc(it.lbl)}</div>`;
+    const dis = typeof it.dis === 'function' ? it.dis() : it.dis, chk = typeof it.chk === 'function' ? it.chk() : it.chk;
+    return `<div class="it${dis ? ' dis' : ''}" data-i="${i}"><span>${chk ? '✓' : ''}</span><span>${esc(it.l)}</span><span class="k">${esc(it.k || '')}</span></div>`;
+  }).join('');
+  dd.classList.add('show');
+  const r = dd.getBoundingClientRect(); dd.style.left = Math.min(x, innerWidth - r.width - 2) + 'px'; dd.style.top = Math.min(y, innerHeight - r.height - 2) + 'px';
+  dd.querySelectorAll('.it').forEach(el => el.onclick = ev => { ev.stopPropagation(); const it = items[+el.dataset.i]; if (el.classList.contains('dis')) return; closeMenus(); it.f && it.f(); });
+  menuOpen = owner || 'ctx';
+}
+function closeMenus() { $('#dd').classList.remove('show'); document.querySelectorAll('#menubar .mi').forEach(m => m.classList.remove('open')); menuOpen = null; }
+document.addEventListener('pointerdown', e => { if (!e.target.closest('#dd') && !e.target.closest('#menubar .mi')) closeMenus(); });
+const hzPresets = [1, 2, 4, 10, 30, 100, 1000];
+const MENUS = {
+  File: () => [
+    { l: 'New circuit', f: () => FILE.new() }, { l: 'Open / import JSON...', k: 'Ctrl+O', f: () => $('#file').click() }, '-',
+    { l: 'Export project bundle...', f: FILE.exportProject }, { l: 'Export library...', f: FILE.exportLib }, { l: 'Export current circuit as chip...', f: exportCurrent }, '-',
+    { lbl: 'Examples (adds their pre-built chips to your library)' },
+    ...EXAMPLES.map(ex => ({ l: '    ' + ex.name, f: () => loadExample(ex) })), '-',
+    ...(hasOld() ? [{ l: 'Import session from previous version', f: importOld }, '-'] : []),
+    { l: 'Clear library and circuit...', f: FILE.wipe },
+  ],
+  Edit: () => [
+    { l: 'Undo', k: 'Ctrl+Z', f: undo, dis: !L().undo.length }, { l: 'Redo', k: 'Ctrl+Y', f: redo, dis: !L().redo.length }, '-',
+    { l: 'Cut', k: 'Ctrl+X', f: () => { if (copySel()) delSel(); }, dis: !S.sel.size }, { l: 'Copy', k: 'Ctrl+C', f: copySel, dis: !S.sel.size }, { l: 'Paste', k: 'Ctrl+V', f: paste, dis: !S.clip },
+    { l: 'Duplicate', k: 'Ctrl+D', f: () => { if (copySel()) paste(); }, dis: !S.sel.size }, { l: 'Delete', k: 'Del', f: delSel, dis: !S.sel.size && !S.selW.size }, '-',
+    { l: 'Select all', k: 'Ctrl+A', f: selectAll }, '-',
+    { l: 'Rotate clockwise', k: 'R', f: () => transformSel(c => { c.rot = ((c.rot | 0) + 1) & 3; }), dis: !S.sel.size },
+    { l: 'Rotate counter-clockwise', k: 'Shift+R', f: () => transformSel(c => { c.rot = ((c.rot | 0) + 3) & 3; }), dis: !S.sel.size },
+    { l: 'Flip horizontal', k: 'F', f: () => transformSel(c => { c.flip = !c.flip; }), dis: !S.sel.size }, '-',
+    { l: L().chipId ? 'Save chip' : 'Save circuit to library', k: 'Ctrl+S', f: saveToLibrary }, { l: 'Save as new chip', f: saveAsNew },
+    ...(L().chipId ? [{ l: 'Save chip and close', f: () => closeTo(S.levels.length - 2, true) }, { l: 'Discard chip changes', f: () => closeTo(S.levels.length - 2, false) }] : []),
+  ],
+  Wiring: () => [
+    { l: 'Trace selection in analyzer', k: 'T', f: traceSel }, '-',
+    { l: 'Remove bend points from selected wires', f: unbendSel, dis: !S.selW.size }, { l: 'Delete selected wires', f: delWiresSel, dis: !S.selW.size }, '-',
+    { l: 'Snap to grid', k: 'G', chk: S.snap, f: () => { S.snap = !S.snap; renderToolbar(); persist(); } },
+    '-', { lbl: 'Drag pin to pin to wire. Click empty canvas while wiring to add a bend.' },
+  ],
+  Simulate: () => [
+    { l: S.running ? 'Pause clock' : 'Run clock', k: 'P', f: toggleRun }, { l: 'Step one clock edge', k: '.', f: step }, { l: 'Reset simulation', f: resetSim }, '-',
+    { l: 'Turbo (max ticks per frame)', chk: S.turbo, f: () => { S.turbo = !S.turbo; renderToolbar(); } }, '-', { lbl: 'Clock frequency' },
+    ...hzPresets.map(h => ({ l: '    ' + (h >= 1000 ? h / 1000 + ' kHz' : h + ' Hz'), chk: S.hz === h, f: () => { setHz(h); renderToolbar(); persist(); } })), '-',
+    { l: 'Clear analyzer history', f: () => { for (const t of S.traces) t.hist = []; S.anDirty = true; } }, { l: 'Remove all traces', f: () => { S.traces = []; sizeCanvases(); } },
+  ],
+  View: () => [
+    { l: 'Show grid', chk: S.grid, f: () => { S.grid = !S.grid; S.dirty = true; persist(); } }, '-',
+    { l: 'Zoom in', k: '+', f: () => zoomC(1.2) }, { l: 'Zoom out', k: '-', f: () => zoomC(1 / 1.2) }, { l: 'Actual size (100%)', f: () => zoomC(1 / S.view.z) }, { l: 'Zoom to fit', k: 'Home', f: fit }, '-',
+    { l: 'Components panel', chk: S.ui.pal, f: () => togglePanel('pal') }, { l: 'Properties panel', chk: S.ui.ins, f: () => togglePanel('ins') }, { l: 'Logic analyzer', chk: S.ui.an, f: () => togglePanel('an') },
+  ],
+  Help: () => [{ l: 'Keyboard shortcuts', f: showKeys }, { l: 'Signal rules', f: showRules }, { l: 'About', f: () => dialog('About', '<b>Switchboard</b> switch-level digital logic simulator.<br>Single-file, runs offline. Data is stored in this browser (localStorage); use File > Export to back up.') }],
+};
+function renderMenubar() {
+  const mb = $('#menubar');
+  mb.innerHTML = Object.keys(MENUS).map(k => `<div class="mi" data-m="${k}">${k}</div>`).join('') + `<div class="title" id="crumbs"></div>`;
+  mb.querySelectorAll('.mi').forEach(el => {
+    const open = () => { closeMenus(); el.classList.add('open'); const r = el.getBoundingClientRect(); showMenu(MENUS[el.dataset.m](), r.left, r.bottom, el.dataset.m); el.classList.add('open'); };
+    el.onpointerdown = e => { e.stopPropagation(); if (menuOpen === el.dataset.m) closeMenus(); else open(); };
+    el.onpointerenter = () => { if (menuOpen && menuOpen !== 'ctx' && menuOpen !== el.dataset.m) open(); };
+  });
+}
+
+/* ---------------- dialog ---------------- */
+function dialog(title, html, buttons) {
+  $('#dlgT').textContent = title; $('#dlgB').innerHTML = html;
+  const bs = buttons || [{ l: 'OK', pri: true }];
+  $('#dlgF').innerHTML = bs.map((b, i) => `<button class="btn${b.pri ? ' pri' : ''}" data-i="${i}">${esc(b.l)}</button>`).join('');
+  $('#dlgF').querySelectorAll('button').forEach(el => el.onclick = () => { const b = bs[+el.dataset.i]; closeDlg(); b.f && b.f(); });
+  $('#dlgWrap').classList.add('show'); const pri = $('#dlgF .pri'); if (pri) pri.focus();
+}
+function closeDlg() { $('#dlgWrap').classList.remove('show'); }
+function showKeys() {
+  const K = [['Drag pin to pin', 'Draw a wire'], ['Click empty while wiring', 'Add a bend point'], ['Click toggle / input bits', 'Flip values'], ['Hold push button', 'Momentary 1'], ['Double-click chip', 'Open its circuit'],
+    ['Ctrl+Z / Ctrl+Y', 'Undo / redo'], ['Ctrl+X / C / V / D', 'Cut / copy / paste / duplicate'], ['Ctrl+A', 'Select all'], ['Shift+click, drag box', 'Multi-select'], ['Del, Backspace', 'Delete selection'],
+    ['R / Shift+R', 'Rotate'], ['F', 'Flip'], ['T', 'Trace in logic analyzer'], ['P', 'Run / pause clock'], ['.', 'Step one clock edge'], ['G', 'Toggle grid snap'],
+    ['Wheel, pinch', 'Zoom'], ['Right/middle drag, Space+drag', 'Pan'], ['Right-click', 'Context menu'], ['Home, 0', 'Zoom to fit'], ['Ctrl+S', 'Save chip / save to library'], ['Ctrl+O', 'Import JSON'], ['Esc', 'Cancel']];
+  dialog('Keyboard Shortcuts', `<table>${K.map(([a, b]) => `<tr><td>${esc(a)}</td><td>${esc(b)}</td></tr>`).join('')}</table>`);
+}
+function showRules() {
+  dialog('Signal Rules', `<h5>Net resolution</h5>Each net bit is driven to 1, driven to 0, floating (Z), or shorted (X).<br>
+  A floating net reads as 0 (pull-down) and is drawn dashed grey. A net driven to 1 and 0 at once is a short: drawn red and counted in the status bar.
+  <h5>Switches</h5>NO conducts <code>in -> out</code> while <code>ctrl = 1</code>. NC conducts while <code>ctrl = 0</code>. When open, the output is Z. A closed switch passes 1, 0 or Z from its input.
+  <h5>Timing</h5>Propagation is event-driven with zero delay. Each settle has an evaluation budget, so feedback that never settles reports "Oscillating" instead of hanging.
+  <h5>Chips</h5>Input/Output ports become chip pins, ordered top-to-bottom. Chips compile once into flat cached netlists, so nesting depth does not slow the editor.`);
+}
+
+/* ---------------- toolbar ---------------- */
+const ICO = {
+  new: '<path d="M4 1.5h5.5L12.5 4.5V14.5H4z M9.5 1.5V4.5H12.5" fill="none" stroke="currentColor"/>',
+  open: '<path d="M1.5 4.5h4l1.5 1.5h7.5v8h-13z" fill="none" stroke="currentColor"/>',
+  save: '<path d="M2.5 2.5h9l2 2v9h-11z M5 2.5v3.5h5V2.5 M5 13.5v-4h6v4" fill="none" stroke="currentColor"/>',
+  undo: '<path d="M5 3.5L2 6.5L5 9.5 M2 6.5h7.5a3.5 3.5 0 0 1 0 7H6" fill="none" stroke="currentColor" stroke-width="1.3"/>',
+  redo: '<path d="M11 3.5L14 6.5L11 9.5 M14 6.5H6.5a3.5 3.5 0 0 0 0 7H10" fill="none" stroke="currentColor" stroke-width="1.3"/>',
+  play: '<path d="M4.5 2.5L13 8L4.5 13.5z" fill="currentColor"/>',
+  pause: '<path d="M4 2.5h3v11H4z M9 2.5h3v11H9z" fill="currentColor"/>',
+  step: '<path d="M3 2.5L10 8L3 13.5z" fill="currentColor"/><path d="M11 2.5h2v11h-2z" fill="currentColor"/>',
+  reset: '<path d="M3.5 8a4.5 4.5 0 1 0 1.4-3.3 M2.5 2v3.5H6" fill="none" stroke="currentColor" stroke-width="1.3"/>',
+  turbo: '<path d="M9 1.5L3.5 9H8l-1 5.5L12.5 7H8z" fill="currentColor"/>',
+  snap: '<path d="M2 2h1v1H2zM7.5 2h1v1h-1zM13 2h1v1h-1zM2 7.5h1v1H2zM13 7.5h1v1h-1zM2 13h1v1H2zM7.5 13h1v1h-1zM13 13h1v1h-1z" fill="currentColor"/><path d="M5 11L11 5" stroke="currentColor" stroke-width="1.4"/><circle cx="8" cy="8" r="1.6" fill="currentColor"/>',
+  grid: '<path d="M1.5 1.5h13v13h-13z M6 1.5v13 M10.5 1.5v13 M1.5 6h13 M1.5 10.5h13" fill="none" stroke="currentColor" stroke-width=".9"/>',
+  zin: '<circle cx="6.5" cy="6.5" r="4.5" fill="none" stroke="currentColor" stroke-width="1.3"/><path d="M10 10l4.5 4.5 M4.5 6.5h4 M6.5 4.5v4" stroke="currentColor" stroke-width="1.3"/>',
+  zout: '<circle cx="6.5" cy="6.5" r="4.5" fill="none" stroke="currentColor" stroke-width="1.3"/><path d="M10 10l4.5 4.5 M4.5 6.5h4" stroke="currentColor" stroke-width="1.3"/>',
+  fit: '<path d="M1.5 5V1.5H5 M11 1.5h3.5V5 M14.5 11v3.5H11 M5 14.5H1.5V11" fill="none" stroke="currentColor" stroke-width="1.3"/><path d="M5 5h6v6H5z" fill="none" stroke="currentColor"/>',
+  trace: '<path d="M1 11h3V5h3v6h3V5h3v6h2" fill="none" stroke="currentColor" stroke-width="1.2"/>',
+  lib: '<path d="M4 2.5h8v11H4z M2 4.5h2 M2 7.5h2 M2 10.5h2 M12 4.5h2 M12 7.5h2 M12 10.5h2" fill="none" stroke="currentColor"/>',
+};
+const ic = k => `<svg viewBox="0 0 16 16">${ICO[k]}</svg>`;
+function renderToolbar() {
+  const tb = $('#toolbar');
+  tb.innerHTML = `
+    <button class="tb" id="tbNew" title="New circuit">${ic('new')}</button><button class="tb" id="tbOpen" title="Open / import JSON (Ctrl+O)">${ic('open')}</button><button class="tb" id="tbSave" title="${L().chipId ? 'Save chip' : 'Save circuit to library'} (Ctrl+S)">${ic('lib')}</button>
+    <span class="tsep"></span>
+    <button class="tb" id="tbUndo" title="Undo (Ctrl+Z)">${ic('undo')}</button><button class="tb" id="tbRedo" title="Redo (Ctrl+Y)">${ic('redo')}</button>
+    <span class="tsep"></span>
+    <button class="tb${S.running ? ' on' : ''}" id="tbRun" title="${S.running ? 'Pause' : 'Run'} clock (P)">${ic(S.running ? 'pause' : 'play')}</button><button class="tb" id="tbStep" title="Step one clock edge (.)">${ic('step')}</button><button class="tb" id="tbReset" title="Reset simulation state">${ic('reset')}</button>
+    <span class="tlab">Clock</span><input type="number" id="tbHz" min="0.1" max="100000" step="any" value="${S.hz}" title="Clock frequency in Hz"><span class="tlab">Hz</span>
+    <button class="tb${S.turbo ? ' on' : ''}" id="tbTurbo" title="Turbo: run as many ticks as the CPU allows">${ic('turbo')}</button>
+    <span class="tsep"></span>
+    <button class="tb${S.snap ? ' on' : ''}" id="tbSnap" title="Snap to grid (G)">${ic('snap')}</button><button class="tb${S.grid ? ' on' : ''}" id="tbGrid" title="Show grid">${ic('grid')}</button>
+    <span class="tsep"></span>
+    <button class="tb" id="tbZout" title="Zoom out (-)">${ic('zout')}</button><input type="text" id="tbZoom" value="${Math.round(S.view.z * 100)}%" title="Zoom" style="width:52px"><button class="tb" id="tbZin" title="Zoom in (+)">${ic('zin')}</button><button class="tb" id="tbFit" title="Zoom to fit (Home)">${ic('fit')}</button>
+    <span class="tsep"></span>
+    <button class="tb" id="tbTrace" title="Trace selection in analyzer (T)">${ic('trace')}</button>`;
+  const on = (id, f) => { $(id).onclick = f; };
+  on('#tbNew', () => FILE.new()); on('#tbOpen', () => $('#file').click()); on('#tbSave', saveToLibrary);
+  on('#tbUndo', undo); on('#tbRedo', redo); on('#tbRun', toggleRun); on('#tbStep', step); on('#tbReset', resetSim);
+  on('#tbTurbo', () => { S.turbo = !S.turbo; renderToolbar(); });
+  on('#tbSnap', () => { S.snap = !S.snap; renderToolbar(); persist(); }); on('#tbGrid', () => { S.grid = !S.grid; S.dirty = true; renderToolbar(); persist(); });
+  on('#tbZout', () => zoomC(1 / 1.2)); on('#tbZin', () => zoomC(1.2)); on('#tbFit', fit); on('#tbTrace', traceSel);
+  $('#tbHz').onchange = e => { const v = Math.max(0.1, Math.min(100000, Number(e.target.value) || 1)); setHz(+v.toPrecision(4)); e.target.value = S.hz; persist(); };
+  $('#tbZoom').onchange = e => { const v = parseFloat(e.target.value); if (v > 0) zoomC(v / 100 / S.view.z); e.target.value = Math.round(S.view.z * 100) + '%'; cv.focus(); };
+  updUndo();
+}
+
+/* ---------------- component tree ---------------- */
+const PAL = [['Sources', ['power', 'ground', 'toggle', 'button', 'clock']], ['Switches', ['sw_no', 'sw_nc']], ['Ports', ['input', 'output']], ['Wiring', ['split', 'merge', 'note']], ['Displays', ['led', 'busread', 'seg7', 'oled']], ['Memory helpers', ['rom', 'ram']]];
+const TI = {
+  power: '<path d="M2 3.5h10 M7 3.5V13" stroke="currentColor" stroke-width="1.4"/>',
+  ground: '<path d="M7 1v6 M1.5 7h11 M3.5 9.5h7 M5.5 12h3" stroke="currentColor" stroke-width="1.3"/>',
+  toggle: '<path d="M1 9h3 M4 9l6-4 M10 9h3" stroke="currentColor" stroke-width="1.3"/><rect x="3" y="8" width="2" height="2" fill="currentColor"/>',
+  button: '<path d="M1 10h3 M10 10h3 M3.5 7h7 M7 7V3 M5 3h4" stroke="currentColor" stroke-width="1.3"/>',
+  clock: '<path d="M1 10h3V4h4v6h3V4h2" fill="none" stroke="currentColor" stroke-width="1.3"/>',
+  sw_no: '<path d="M1 9h3 M4 9l6-4.5 M10 9h3 M7 13v-5" stroke="currentColor" stroke-width="1.3"/><path d="M7 13v-6" stroke="currentColor" stroke-dasharray="1.5 1.2"/>',
+  sw_nc: '<path d="M1 7h3 M4 7l7 1.5 M10 7h3 M10 4.5V7" stroke="currentColor" stroke-width="1.3"/>',
+  input: '<rect x="8.5" y="3.5" width="5" height="7" fill="none" stroke="currentColor"/><path d="M1 7h6 M5 5l2 2-2 2" fill="none" stroke="currentColor" stroke-width="1.2"/>',
+  output: '<rect x=".5" y="3.5" width="5" height="7" fill="none" stroke="currentColor"/><path d="M6 7h7 M11 5l2 2-2 2" fill="none" stroke="currentColor" stroke-width="1.2"/>',
+  split: '<path d="M1 7h5" stroke="currentColor" stroke-width="2.4"/><path d="M6 2v10 M6 2.5h7 M6 7h7 M6 11.5h7" stroke="currentColor"/>',
+  merge: '<path d="M8 7h5" stroke="currentColor" stroke-width="2.4"/><path d="M8 2v10 M1 2.5h7 M1 7h7 M1 11.5h7" stroke="currentColor"/>',
+  note: '<path d="M2.5 2.5h9 M7 2.5V12.5 M5 12.5h4" stroke="currentColor" stroke-width="1.3"/>',
+  led: '<circle cx="7" cy="7" r="4" fill="none" stroke="currentColor" stroke-width="1.3"/><circle cx="7" cy="7" r="1.8" fill="currentColor"/>',
+  busread: '<rect x=".5" y="3.5" width="13" height="7" fill="none" stroke="currentColor"/><path d="M2.5 5.5h1.5v1.5H2.5zM5 5.5h1.5v1.5H5zM7.5 5.5H9v1.5H7.5zM10 5.5h1.5v1.5H10z" fill="currentColor"/>',
+  seg7: '<path d="M4 1.5h6 M3.5 2v4.5 M10.5 2v4.5 M4 7h6 M3.5 7.5V12 M10.5 7.5V12 M4 12.5h6" stroke="currentColor" stroke-width="1.3"/>',
+  oled: '<rect x="1.5" y="1.5" width="11" height="11" fill="none" stroke="currentColor"/><path d="M4 4h2v2H4zM8 4h2v2H8zM4 9h6v1.5H4z" fill="currentColor"/>',
+  rom: '<rect x="3.5" y="1.5" width="7" height="11" fill="none" stroke="currentColor"/><path d="M5 4h4 M5 6.5h4 M5 9h4" stroke="currentColor"/>',
+  ram: '<rect x="3.5" y="1.5" width="7" height="11" fill="none" stroke="currentColor"/><path d="M5 4h4 M5 6.5h4 M5 9h2" stroke="currentColor"/><path d="M1 12.5h12" stroke="currentColor"/>',
+  chip: '<rect x="4" y="1.5" width="6" height="11" fill="none" stroke="currentColor"/><path d="M1.5 4h2.5 M1.5 7h2.5 M1.5 10h2.5 M10 4h2.5 M10 7h2.5 M10 10h2.5" stroke="currentColor"/>',
+};
+const ti = k => `<svg viewBox="0 0 14 14">${TI[k] || TI.chip}</svg>`;
+const SHORT = { toggle: 'Toggle switch', button: 'Push button', input: 'Input port', output: 'Output port', busread: 'Bus readout', oled: 'OLED display', split: 'Bus splitter', merge: 'Bus merger', note: 'Text note', sw_no: 'NO switch', sw_nc: 'NC switch', seg7: '7-segment display' };
+let palFilter = '';
+function renderPalette() {
+  const b = $('#palBody'), f = palFilter.toLowerCase(), armed = S.place ? (S.place.chipId || S.place.type) : null, col = S.ui.col;
+  const row = (lvl, inner, cls, attrs) => `<div class="tr ${cls || ''}" style="padding-left:${2 + lvl * 12}px" ${attrs || ''}>${inner}</div>`;
+  const grp = (key, label, lvl, meta) => row(lvl, `<span class="tw">${col[key] ? '▸' : '▾'}</span><span class="nm">${esc(label)}</span>${meta != null ? `<span class="meta">${meta}</span>` : ''}`, 'grp', `data-g="${esc(key)}"`);
+  let h = `<input id="treeSearch" placeholder="Filter..." value="${esc(palFilter)}"><div class="tree">`;
+  h += grp('prim', 'Primitives', 0);
+  if (!col.prim || f) for (const [cat, items] of PAL) {
+    const its = items.filter(t => !f || (SHORT[t] || T[t].name).toLowerCase().includes(f)); if (!its.length) continue;
+    h += grp('p:' + cat, cat, 1, its.length);
+    if (!col['p:' + cat] || f) for (const t of its) h += row(2, `<span class="tw"></span><span class="ic">${ti(t)}</span><span class="nm">${esc(SHORT[t] || T[t].name)}</span>`, armed === t ? 'armed' : '', `draggable="true" data-type="${t}" title="${esc(T[t].hint || '')}"`);
+  }
+  const all = Object.values(LIB.chips), chips = all.filter(d => !f || (d.circuit.meta.name || '').toLowerCase().includes(f));
+  h += grp('lib', 'Chip Library', 0, all.length);
+  if (!col.lib || f) {
+    if (!all.length) h += `<div class="tr empty">Empty. Build a circuit with Input/Output ports, set its name in Properties, then Edit &gt; Save circuit to library (Ctrl+S).</div>`;
+    const cats = {}; for (const d of chips) (cats[d.circuit.meta.category || 'Custom'] = cats[d.circuit.meta.category || 'Custom'] || []).push(d);
+    for (const cat of Object.keys(cats).sort()) {
+      h += grp('c:' + cat, cat, 1, cats[cat].length);
+      if (col['c:' + cat] && !f) continue;
+      for (const d of cats[cat].sort((a, c2) => (a.circuit.meta.name || '').localeCompare(c2.circuit.meta.name || ''))) {
+        const m = d.circuit.meta, info = chipInfo(d.id), ok = canUseChip(d.id);
+        h += row(2, `<span class="tw"></span><span class="ic" style="color:${esc(m.color || '#4f8cff')}">${ti('chip')}</span><span class="nm">${esc(m.name || 'Chip')}</span><span class="meta">${info ? info.ins.length + '/' + info.outs.length : ''}</span>`,
+          (armed === d.id ? 'armed ' : '') + (ok ? '' : 'dis'), `draggable="${ok}" data-chip="${d.id}" title="${esc((m.desc || m.name || '') + (info ? `\n${info.ins.length} in, ${info.outs.length} out. Right-click for options.` : ''))}"`);
+      }
+    }
+  }
+  b.innerHTML = h + '</div>';
+  const s = $('#treeSearch'); s.oninput = () => { palFilter = s.value; const pos = s.selectionStart; renderPalette(); const n = $('#treeSearch'); n.focus(); n.setSelectionRange(pos, pos); };
+  b.querySelectorAll('.tr.grp').forEach(el => el.onclick = () => { const k = el.dataset.g; S.ui.col[k] = !S.ui.col[k]; persist(); renderPalette(); });
+  b.querySelectorAll('.tr[data-type],.tr[data-chip]').forEach(el => {
+    const spec = el.dataset.chip ? { type: 'chip', chipId: el.dataset.chip } : { type: el.dataset.type };
+    el.addEventListener('dragstart', e => { e.dataTransfer.setData('text/plain', JSON.stringify(spec)); S.place = spec; });
+    el.addEventListener('dragend', () => { S.place = null; S.dirty = true; });
+    el.addEventListener('click', () => {
+      if (spec.type === 'chip' && !canUseChip(spec.chipId)) { toast("A chip can't contain itself.", true); return; }
+      S.place = (S.place && (S.place.chipId || S.place.type) === (spec.chipId || spec.type)) ? null : spec; S.wiring = null; renderPalette(); hint(); cv.focus();
+    });
+    if (spec.chipId) {
+      el.addEventListener('dblclick', () => { S.place = null; openChip(spec.chipId); });
+      el.addEventListener('contextmenu', e => { e.preventDefault(); libMenu(spec.chipId, e.clientX, e.clientY); });
+    }
+  });
+}
+function libMenu(id, x, y) {
+  const d = LIB.chips[id]; if (!d) return;
+  showMenu([{ l: 'Place on canvas', f: () => { if (canUseChip(id)) { S.place = { type: 'chip', chipId: id }; renderPalette(); hint(); } }, dis: !canUseChip(id) }, { l: 'Open / edit internals', f: () => openChip(id) }, '-',
+    { l: 'Export chip (with dependencies)...', f: () => exportChip(id) }, '-', { l: 'Delete from library...', f: () => deleteChip(id) }], x, y);
+}
+function deleteChip(id) {
+  const d = LIB.chips[id]; if (!d) return;
+  if (S.levels.some(l => l.chipId === id)) { toast('Close that chip before deleting it.', true); return; }
+  const users = Object.values(LIB.chips).filter(x => x.id !== id && chipDeps(x.id).has(id)).map(x => x.circuit.meta.name);
+  const inMain = circDeps(S.main).has(id);
+  dialog('Delete Chip', `Delete <b>${esc(d.circuit.meta.name)}</b> from the library?` + (users.length || inMain ? `<br><br>It is used by: ${esc(users.join(', '))}${inMain ? (users.length ? ', ' : '') + 'the main circuit' : ''}. Those instances will show as missing.` : '') + '<br><br>This cannot be undone.',
+    [{ l: 'Delete', pri: true, f: () => { delete LIB.chips[id]; invalidate(); persist(); renderPalette(); S.need = true; bump(); toast(`Deleted "${d.circuit.meta.name}".`); } }, { l: 'Cancel' }]);
+}
+
+/* ---------------- property grid (inspector) ---------------- */
+const F = { label: { k: 'label', l: 'Label', t: 'text' }, name: { k: 'name', l: 'Name', t: 'text' }, width: { k: 'width', l: 'Bit width', t: 'num', min: 1, max: 32 } };
+const FIELDS = {
+  toggle: [F.label], button: [F.label], clock: [F.label],
+  input: [F.name, F.width, { k: 'value', l: 'Value', t: 'num', min: 0 }], output: [F.name, F.width],
+  sw_no: [{ k: 'width', l: 'Bus width', t: 'num', min: 1, max: 32 }], sw_nc: [{ k: 'width', l: 'Bus width', t: 'num', min: 1, max: 32 }],
+  split: [F.width], merge: [F.width], led: [F.label, { k: 'color', l: 'Color', t: 'color' }], busread: [F.label, F.width],
+  seg7: [{ k: 'mode', l: 'Mode', t: 'sel', o: [['hex', '4-bit hex'], ['seg', 'Segments a-g, dp']] }, { k: 'color', l: 'Color', t: 'color' }],
+  oled: [{ k: 'res', l: 'Resolution', t: 'sel', o: [[16, '16 x 16'], [32, '32 x 32'], [64, '64 x 64']] }, { k: 'color', l: 'Color mode', t: 'sel', o: [['mono', 'Mono (1-bit D)'], ['gray', 'Gray (4-bit D)'], ['rgb', 'RGB 332 (8-bit D)']] }],
+  rom: [{ k: 'addrBits', l: 'Address bits', t: 'num', min: 1, max: 16 }, { k: 'dataBits', l: 'Data bits', t: 'num', min: 1, max: 32 }],
+  ram: [{ k: 'addrBits', l: 'Address bits', t: 'num', min: 1, max: 16 }, { k: 'dataBits', l: 'Data bits', t: 'num', min: 1, max: 32 }],
+  note: [],
+};
+function fieldHTML(f, v) {
+  if (f.t === 'sel') return `<select data-k="${f.k}">${f.o.map(([val, lab]) => `<option value="${val}"${String(val) === String(v) ? ' selected' : ''}>${lab}</option>`).join('')}</select>`;
+  if (f.t === 'color') return `<input type="color" data-k="${f.k}" value="${esc(v || '#ff4d4d')}"> <span class="mono">${esc(v || '')}</span>`;
+  if (f.t === 'num') return `<input type="number" class="mono" data-k="${f.k}" value="${esc(v)}"${f.min != null ? ` min="${f.min}"` : ''}${f.max != null ? ` max="${f.max}"` : ''}>`;
+  return `<input type="text" data-k="${f.k}" value="${esc(v)}">`;
+}
+function propGrid(sections) {
+  let h = '<table class="pg">';
+  for (const s of sections) {
+    const col = S.ui.col['pg:' + s.t];
+    h += `<tr class="cat${col ? ' col' : ''}" data-c="${esc(s.t)}"><td colspan="2">${esc(s.t)}</td></tr>`;
+    if (col) continue;
+    for (const r of s.rows) h += r.full != null ? `<tr><td colspan="2" class="full">${r.full}</td></tr>` : `<tr><th title="${esc(r[0])}">${esc(r[0])}</th><td class="${r[2] || ''}">${r[1]}</td></tr>`;
+  }
+  return h + '</table>';
+}
+function bindPg(el) { el.querySelectorAll('tr.cat').forEach(r => r.onclick = () => { const k = 'pg:' + r.dataset.c; S.ui.col[k] = !S.ui.col[k]; persist(); renderInspector(); }); }
+function bindBtns(el, map) { el.querySelectorAll('[data-a]').forEach(b => { if (map[b.dataset.a]) b.onclick = map[b.dataset.a]; }); }
+function renderInspector() {
+  const el = $('#insBody'); if (!el) return;
+  const m = cmap();
+  if (S.sel.size === 1 && S.selW.size === 0) { const c = m.get([...S.sel][0]); if (c) return compPanel(el, c); }
+  if (S.selW.size >= 1 && S.sel.size === 0 && S.selW.size === 1) { const w = C().wires.find(x => S.selW.has(x.id)); if (w) return wirePanel(el, w); }
+  if (S.sel.size + S.selW.size > 1) {
+    el.innerHTML = `<div class="objsel">Multiple selection <span>${S.sel.size} parts, ${S.selW.size} wires</span></div>` +
+      propGrid([{ t: 'Selection', rows: [['Parts', S.sel.size, 'mono'], ['Wires', S.selW.size, 'mono']] }]) +
+      `<div class="pgbtns"><button class="btn" data-a="rot">Rotate</button><button class="btn" data-a="flip">Flip</button><button class="btn" data-a="dup">Duplicate</button><button class="btn" data-a="trace">Trace</button><button class="btn danger" data-a="del">Delete</button></div>`;
+    bindPg(el); bindBtns(el, { rot: () => transformSel(c => { c.rot = ((c.rot | 0) + 1) & 3; }), flip: () => transformSel(c => { c.flip = !c.flip; }), dup: () => { if (copySel()) paste(); }, trace: traceSel, del: delSel });
+    return;
+  }
+  circuitPanel(el);
+}
+function compPanel(el, c) {
+  const t = T[c.type], fields = FIELDS[c.type] || [], d = c.type === 'chip' ? LIB.chips[c.props.chipId] : null;
+  const title = c.type === 'chip' ? (d ? d.circuit.meta.name : 'Missing chip') : (SHORT[c.type] || t.name);
+  const sections = [{ t: 'General', rows: [['Type', esc(c.type === 'chip' ? 'Chip instance' : t.name), 'ro'], ['ID', esc(c.id), 'ro mono'], ...fields.map(f => [f.l, fieldHTML(f, c.props[f.k])])] }];
+  if (c.type === 'note') sections[0].rows.push({ full: `<textarea data-k="text" rows="4" style="font-family:${UIF};font-size:12px">${esc(c.props.text)}</textarea>` });
+  if (d) { const m = d.circuit.meta, info = chipInfo(d.id);
+    sections.push({ t: 'Chip', rows: [['Category', esc(m.category), 'ro'], ['Inputs', esc(info.ins.map(p => p.n + (p.w > 1 ? `[${p.w}]` : '')).join(', ') || '-'), 'ro mono'], ['Outputs', esc(info.outs.map(p => p.n + (p.w > 1 ? `[${p.w}]` : '')).join(', ') || '-'), 'ro mono'], ['Parts inside', d.circuit.components.length, 'ro mono'], ['Version', d.version, 'ro mono']] }); }
+  sections.push({ t: 'Layout', rows: [['X, Y', `${c.x / GRID}, ${c.y / GRID}`, 'ro mono'], ['Rotation', `${((c.rot | 0) & 3) * 90}°`, 'ro mono'], ['Flipped', c.flip ? 'Yes' : 'No', 'ro']] });
+  if (c.type === 'rom') {
+    const src = c.props.src || romToSrc(c.props.data || [], c.props.dataBits);
+    sections.push({ t: 'Contents', rows: [['Words', `${(c.props.data || []).length} / ${1 << Math.min(16, clampW(c.props.addrBits))}`, 'ro mono'],
+      { full: `<textarea id="romSrc" rows="9" spellcheck="false">${esc(src)}</textarea><div id="romErr" class="err"></div><button class="btn" data-a="romApply">Apply contents</button>` }] });
+  }
+  const pins = G(c).pins;
+  if (pins.length) sections.push({ t: 'Pins', rows: pins.map(p => [`${p.label || p.n}  (${p.w > 1 ? p.w + 'b ' : ''}${p.dir})`, `<span data-net="${c.id}|${esc(p.n)}"></span><span class="tr8" data-trace="${esc(p.n)}" title="Trace in logic analyzer">trace</span>`, 'mono']) });
+  let btns = `<button class="btn" data-a="rot">Rotate</button><button class="btn" data-a="flip">Flip</button><button class="btn" data-a="dup">Duplicate</button><button class="btn danger" data-a="del">Delete</button>`;
+  if (d) btns = `<button class="btn pri" data-a="open">Open chip</button><button class="btn" data-a="exp">Export</button>` + btns;
+  if (c.type === 'ram') btns += `<button class="btn" data-a="ramClr">Clear RAM</button>`;
+  if (c.type === 'oled') btns += `<button class="btn" data-a="oledClr">Clear screen</button>`;
+  const desc = c.type === 'oled' ? 'CLK wired: writes D to (X,Y) on rising CLK while WE=1. CLK unwired: writes while WE=1. CLR rising edge clears.'
+    : c.type === 'rom' ? 'Hex by default. <code>0b</code> binary, <code>#</code> decimal, <code>@addr</code> sets address, <code>;</code> comment.'
+    : c.type === 'input' ? 'Top level: click bits on canvas to toggle. Inside a chip: becomes an input pin.'
+    : d ? esc(d.circuit.meta.desc || '') : esc(t.hint || '');
+  el.innerHTML = `<div class="objsel">${esc(title)} <span>${esc(c.type)}</span></div>` + propGrid(sections) + `<div class="pgbtns">${btns}</div>` + (desc ? `<div class="desc">${desc}</div>` : '');
+  bindPg(el);
+  el.querySelectorAll('[data-k]').forEach(inp => {
+    const apply = () => {
+      const f = fields.find(x => x.k === inp.dataset.k) || { k: inp.dataset.k, t: 'area' }; let v = inp.value;
+      if (f.t === 'num') { v = Math.round(Number(v)); if (isNaN(v)) return; if (f.min != null) v = Math.max(f.min, v); if (f.max != null) v = Math.min(f.max, v); }
+      if (f.t === 'sel' && typeof f.o[0][0] === 'number') v = Number(v);
+      if (f.k === 'name') { v = String(v).trim() || 'P'; const used = portNames(c); if (used.has(v)) { let i = 2; while (used.has(v + i)) i++; v = v + i; toast('Port names must be unique. Renamed to ' + v); } }
+      if (c.props[f.k] === v) return;
+      commit(); c.props[f.k] = v;
+      if (c.type === 'input' && f.k === 'width') c.props.value = (c.props.value | 0) & M(clampW(v));
+      if (c.type === 'rom' && f.k === 'dataBits') c.props.src = romToSrc(c.props.data || [], v);
+      changed(f.t === 'area' || f.t === 'text');
+    };
+    inp.addEventListener('change', apply);
+    if (inp.tagName === 'TEXTAREA' || inp.type === 'text') inp.addEventListener('input', () => { if (inp.dataset.k === 'text' || inp.dataset.k === 'label') { c.props[inp.dataset.k] = inp.value; bump(); } });
+  });
+  bindBtns(el, {
+    open: () => openChip(c.props.chipId), exp: () => exportChip(c.props.chipId),
+    rot: () => transformSel(x => { x.rot = ((x.rot | 0) + 1) & 3; }), flip: () => transformSel(x => { x.flip = !x.flip; }),
+    dup: () => { if (copySel()) paste(); }, del: delSel,
+    romApply: () => { const src = $('#romSrc').value, r = parseRom(src); $('#romErr').textContent = r.err || ''; if (r.err) return; const n = 1 << Math.min(16, clampW(c.props.addrBits)); if (r.data.length > n) { $('#romErr').textContent = `${r.data.length} words exceed ${n} addresses. Increase address bits.`; return; } commit(); c.props.data = r.data; c.props.src = src; changed(); toast(`ROM loaded: ${r.data.length} words`); },
+    ramClr: () => { const s = RT.get(c.id); if (s && s.mem) s.mem.fill(0); S.need = true; toast('RAM cleared'); },
+    oledClr: () => { const s = RT.get(c.id); if (s && s.buf) { s.buf.fill(0); s.dirty = true; S.dirty = true; } },
+  });
+  el.querySelectorAll('[data-trace]').forEach(b => b.onclick = () => addTrace(c, b.dataset.trace));
+  renderInspectorLive(true);
+}
+function wirePanel(el, w) {
+  const wg = wGeom(w), n = netOf(w.a.c, w.a.p), m = cmap(), ca = m.get(w.a.c), cb = m.get(w.b.c);
+  const nm = c => c ? (c.type === 'chip' ? (LIB.chips[c.props.chipId] ? LIB.chips[c.props.chipId].circuit.meta.name : 'chip') : (c.props.name || c.props.label || SHORT[c.type] || T[c.type].name)) : '?';
+  el.innerHTML = `<div class="objsel">Wire <span>${esc(w.id)}</span></div>` + propGrid([
+    { t: 'Connection', rows: [['From', esc(`${nm(ca)}.${w.a.p}`), 'ro mono'], ['To', esc(`${nm(cb)}.${w.b.p}`), 'ro mono'], ['Width', wg ? (wg.bus ? 'bus' : '1 bit') : '-', 'ro'], ['Bend points', (w.pts || []).length, 'ro mono'], ['Status', wg && wg.bad ? '<span style="color:#ff8a80">width mismatch</span>' : 'connected', 'ro']] },
+    { t: 'Value', rows: [{ full: `<div class="mono" style="white-space:pre;padding:2px" data-netv="${w.a.c}|${esc(w.a.p)}">${esc(valText(n, true))}</div>` }] }]) +
+    `<div class="pgbtns"><button class="btn" data-a="trace">Trace</button>${w.pts && w.pts.length ? '<button class="btn" data-a="unbend">Remove bends</button>' : ''}<button class="btn danger" data-a="del">Delete</button></div>`;
+  bindPg(el); bindBtns(el, { trace: traceSel, del: delSel, unbend: unbendSel });
+}
+function circuitPanel(el) {
+  const c = C(), m = c.meta, l = L(), lvl = !!l.chipId, ports = portsOf(c), s = S.sim, counts = s ? s.counts : {};
+  const cats = [...new Set(Object.values(LIB.chips).map(d => d.circuit.meta.category))];
+  el.innerHTML = `<div class="objsel">${esc(m.name || 'Untitled')} <span>${lvl ? 'chip definition' : 'main circuit'}</span></div>` + propGrid([
+    { t: lvl ? 'Chip definition' : 'Circuit', rows: [['Name', `<input data-m="name" value="${esc(m.name)}">`], ['Category', `<input data-m="category" value="${esc(m.category)}" list="catList"><datalist id="catList">${cats.map(x => `<option value="${esc(x)}">`).join('')}</datalist>`],
+      ['Badge text', `<input data-m="icon" value="${esc(m.icon)}" maxlength="3">`], ['Color', `<input type="color" data-m="color" value="${esc(m.color || '#4f8cff')}"> <span class="mono">${esc(m.color || '')}</span>`],
+      { full: `<textarea data-m="desc" rows="2" placeholder="Description" style="font-family:${UIF};font-size:12px">${esc(m.desc)}</textarea>` }] },
+    { t: 'Pins (top to bottom)', rows: [['Inputs', esc(ports.ins.map(p => p.n + (p.w > 1 ? `[${p.w}]` : '')).join(', ') || '-'), 'ro mono'], ['Outputs', esc(ports.outs.map(p => p.n + (p.w > 1 ? `[${p.w}]` : '')).join(', ') || '-'), 'ro mono']] },
+    { t: 'Statistics', rows: [['Top-level parts', c.components.length, 'ro mono'], ['Wires', c.wires.length, 'ro mono'], ['Switches (flattened)', counts.SW || 0, 'ro mono'], ['Primitives', s ? s.E : 0, 'ro mono'], ['Nets', s ? s.N : 0, 'ro mono'], ['Library chips', Object.keys(LIB.chips).length, 'ro mono']] },
+  ]) + `<div class="pgbtns">${lvl ? '<button class="btn pri" data-a="save">Save chip</button><button class="btn" data-a="done">Save &amp; close</button><button class="btn" data-a="asNew">Save as new</button>' : '<button class="btn pri" data-a="lib">Save to library</button>'}<button class="btn" data-a="exp">Export as chip</button></div>`;
+  bindPg(el);
+  el.querySelectorAll('[data-m]').forEach(inp => {
+    inp.addEventListener('input', () => { c.meta[inp.dataset.m] = inp.value; if (lvl) l.edited = true; renderCrumbs(); persist(); });
+    inp.addEventListener('change', () => { c.meta[inp.dataset.m] = inp.value; persist(); });
+  });
+  bindBtns(el, { save: () => saveChip(), done: () => closeTo(S.levels.length - 2, true), lib: saveToLibrary, exp: exportCurrent, asNew: saveAsNew });
+}
+let liveT = 0;
+function renderInspectorLive(force) {
+  const now = performance.now(); if (!force && now - liveT < 200) return; liveT = now;
+  document.querySelectorAll('#insBody [data-net]').forEach(s => { const [cid, p] = s.dataset.net.split('|'); s.textContent = valText(netOf(cid, p)); });
+  document.querySelectorAll('#insBody [data-netv]').forEach(s => { const [cid, p] = s.dataset.netv.split('|'); s.textContent = valText(netOf(cid, p), true); });
+}
+
+/* ---------------- logic analyzer ---------------- */
+const HMAX = 1200;
+function addTrace(c, p) {
+  if (S.traces.some(t => t.c === c.id && t.p === p)) return;
+  const pin = G(c).pm.get(p); if (!pin) return;
+  const base = c.type === 'chip' ? (LIB.chips[c.props.chipId] ? LIB.chips[c.props.chipId].circuit.meta.name : 'chip') : (c.props.name || c.props.label || SHORT[c.type] || T[c.type].name);
+  S.traces.push({ c: c.id, p, label: `${base}.${pin.label || p}`.replace(/\.$/, ''), w: pin.w, net: netOf(c.id, p), hist: [] });
+  if (!S.ui.an) togglePanel('an'); S.anDirty = true; sizeCanvases(); sample();
+}
+function traceSel() {
+  const m = cmap(); let n = 0;
+  for (const w of C().wires) if (S.selW.has(w.id)) { const c = m.get(w.a.c); if (c) { addTrace(c, w.a.p); n++; } }
+  for (const id of S.sel) { const c = m.get(id); if (!c) continue; const pins = G(c).pins; const outs = pins.filter(p => p.dir === 'out'); for (const p of (outs.length ? outs : pins).slice(0, 8)) { addTrace(c, p.n); n++; } }
+  if (!n) toast('Select a wire or a part first, then trace it (T).');
+}
+function sample() {
+  const s = S.sim; if (!s || !S.traces.length) return;
+  for (const t of S.traces) {
+    const n = t.net; t.hist.push(n === undefined ? null : { v: s.val[n] >>> 0, z: s.zm[n] === s.nm[n], x: s.xm[n] !== 0 });
+    if (t.hist.length > HMAX * 1.5) t.hist.splice(0, t.hist.length - HMAX);
+  }
+  S.anDirty = true;
+}
+const ROWH = 20, LBLW = 150;
+function drawAn() {
+  const W = an.width / DPR, H = an.height / DPR; ag.setTransform(DPR, 0, 0, DPR, 0, 0); ag.fillStyle = '#1e1e1e'; ag.fillRect(0, 0, W, H);
+  $('#anEmpty').style.display = S.traces.length ? 'none' : 'flex';
+  $('#anInfo').textContent = S.traces.length ? `  ${S.traces.length} signal(s)` : '';
+  if (!S.traces.length) return;
+  const px = 12, cols = Math.max(1, Math.floor((W - LBLW - 4) / px));
+  ag.fillStyle = '#2b2b2b'; ag.fillRect(0, 0, LBLW, H);
+  ag.strokeStyle = '#2a2a2a'; ag.lineWidth = 1;
+  for (let k = 0; k <= cols; k += 4) { const x = LBLW + k * px + .5; ag.beginPath(); ag.moveTo(x, 0); ag.lineTo(x, H); ag.stroke(); }
+  S.traces.forEach((t, r) => {
+    const y = r * ROWH, top = y + 4, bot = y + ROWH - 4, mid = y + ROWH / 2;
+    ag.font = `11px ${MONO}`; ag.fillStyle = '#d0d0d0'; ag.textAlign = 'left'; ag.textBaseline = 'middle';
+    let lab = t.label; while (ag.measureText(lab).width > LBLW - 24 && lab.length > 3) lab = lab.slice(0, -2) + '~';
+    ag.fillText(lab, 6, mid); ag.fillStyle = '#7a7a7a'; ag.fillText('x', LBLW - 13, mid);
+    ag.strokeStyle = '#333'; ag.beginPath(); ag.moveTo(0, y + ROWH - .5); ag.lineTo(W, y + ROWH - .5); ag.stroke();
+    ag.strokeStyle = '#3c3f41'; ag.beginPath(); ag.moveTo(LBLW - .5, y); ag.lineTo(LBLW - .5, y + ROWH); ag.stroke();
+    const h = t.hist, start = Math.max(0, h.length - cols);
+    if (t.w === 1) {
+      ag.lineWidth = 1.4; let prev = null;
+      for (let i = start; i < h.length; i++) {
+        const s = h[i], x = LBLW + (i - start) * px; if (!s) { prev = null; continue; }
+        const yy = s.x || s.z ? mid : (s.v & 1 ? top : bot);
+        ag.strokeStyle = s.x ? CL.x : s.z ? CL.z : CL.on;
+        ag.beginPath(); if (prev != null && prev !== yy) { ag.moveTo(x + .5, prev); ag.lineTo(x + .5, yy); } else ag.moveTo(x, yy); ag.lineTo(x + px, yy); ag.stroke();
+        prev = yy;
+      }
+    } else {
+      let i = start;
+      while (i < h.length) {
+        let j = i + 1; const s = h[i]; while (j < h.length && h[j] && s && h[j].v === s.v && h[j].z === s.z && h[j].x === s.x) j++;
+        const x0 = LBLW + (i - start) * px, x1 = LBLW + (j - start) * px;
+        if (s) { ag.strokeStyle = s.x ? CL.x : s.z ? CL.z : CL.bus; ag.lineWidth = 1.2;
+          ag.beginPath(); ag.moveTo(x0, mid); ag.lineTo(x0 + 2.5, top); ag.lineTo(x1 - 2.5, top); ag.lineTo(x1, mid); ag.lineTo(x1 - 2.5, bot); ag.lineTo(x0 + 2.5, bot); ag.closePath(); ag.stroke();
+          const lab2 = s.z ? 'Z' : s.x ? 'X' : hex(s.v, t.w); ag.font = `10px ${MONO}`; if (x1 - x0 > ag.measureText(lab2).width + 6) { ag.fillStyle = '#cfe6ff'; ag.textAlign = 'center'; ag.fillText(lab2, (x0 + x1) / 2, mid + .5); } }
+        i = j;
+      }
+    }
+  });
+}
+an.addEventListener('click', e => { const r = an.getBoundingClientRect(), x = e.clientX - r.left, y = e.clientY - r.top, row = Math.floor(y / ROWH); if (x > LBLW - 20 && x < LBLW && S.traces[row]) { S.traces.splice(row, 1); sizeCanvases(); S.anDirty = true; } });
+
+/* ---------------- sim controls ---------------- */
+function setHz(h) { S.hz = h; }
+function toggleRun() { S.running = !S.running; renderToolbar(); }
+function step() { if (!S.sim) return; S.sim.edge(); S.sim.settle(); sample(); S.dirty = true; renderInspectorLive(true); }
+function resetSim() { RT.clear(); OC.clear(); for (const t of S.traces) t.hist = []; S.need = true; toast('Simulation reset.'); }
+
+/* ---------------- import / export ---------------- */
+const slug = s => String(s || 'circuit').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'circuit';
+function download(name, obj) { const b = new Blob([JSON.stringify(obj)], { type: 'application/json' }), a = document.createElement('a'); a.href = URL.createObjectURL(b); a.download = name; document.body.appendChild(a); a.click(); setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1000); }
+function exportChip(id) { const d = LIB.chips[id]; if (!d) return; const chips = {}; for (const x of [id, ...chipDeps(id)]) if (LIB.chips[x]) chips[x] = LIB.chips[x]; download(slug(d.circuit.meta.name) + '.chip.json', { format: 'switchboard-chip', version: 1, root: id, chips }); toast(`Exported "${d.circuit.meta.name}" with ${Object.keys(chips).length - 1} dependencies.`); }
+function exportCurrent() { const c = C(), id = L().chipId || uid('chip'), chips = {}; for (const x of circDeps(c)) if (LIB.chips[x]) chips[x] = LIB.chips[x]; chips[id] = { id, version: 1, circuit: c }; download(slug(c.meta.name) + '.chip.json', { format: 'switchboard-chip', version: 1, root: id, chips }); }
+function importObj(o, quiet) {
+  if (!o || typeof o !== 'object') throw new Error('Not a JSON object');
+  let n = 0;
+  const chips = o.chips || (o.library && o.library.chips) || null;
+  if (chips) for (const [id, d] of Object.entries(chips)) { if (!d || !d.circuit || !Array.isArray(d.circuit.components)) continue; const old = LIB.chips[id]; LIB.chips[id] = { id, version: (old ? old.version : 0) + (d.version || 1), circuit: d.circuit }; n++; }
+  invalidate();
+  const proj = o.project || o.main || (Array.isArray(o.components) ? o : null);
+  if (proj) { closeTo(0, true); commit(); S.main.meta = proj.meta || newCirc().meta; S.main.components = proj.components || []; S.main.wires = proj.wires || []; RT.clear(); OC.clear(); changed(); fit(); }
+  persist(); renderAll();
+  if (!quiet) toast(`Imported ${n} chip(s)${proj ? ' and the project circuit' : ''}.`);
+}
+function importOld() { try { importObj(JSON.parse(localStorage.getItem(OLDKEY)), true); toast('Imported previous session (circuit and library).'); } catch (e) { toast('Import failed: ' + e.message, true); } }
+$('#file').addEventListener('change', e => { const f = e.target.files[0]; if (!f) return; const r = new FileReader(); r.onload = () => { try { importObj(JSON.parse(r.result)); } catch (err) { toast('Import failed: ' + err.message, true); } }; r.readAsText(f); e.target.value = ''; });
+function loadExample(ex) {
+  const go = () => {
+    closeTo(0, true); commit();
+    const circ = ex.build(); S.main.meta = circ.meta; S.main.components = circ.components; S.main.wires = circ.wires;
+    RT.clear(); OC.clear(); S.traces = []; S.sel.clear(); S.selW.clear(); invalidate(); changed(); renderAll(); fit(); sizeCanvases();
+    if (ex.id === 3) { setHz(30); if (!S.running) S.running = true; renderToolbar(); }
+    toast(`Loaded example "${ex.name}". Its pre-built chips were added to the library.`);
+  };
+  dialog('Load Example', `Load <b>${esc(ex.name)}</b>?<br><br>This replaces the main circuit (undo restores it) and adds the example's pre-built chips (gates, adders, etc.) to your library, overwriting earlier copies of those example chips.`, [{ l: 'Load', pri: true, f: go }, { l: 'Cancel' }]);
+}
+const FILE = {
+  new: () => { closeTo(0, true); commit(); S.main.meta = newCirc().meta; S.main.components = []; S.main.wires = []; S.traces = []; changed(); fit(); renderAll(); sizeCanvases(); },
+  exportProject: () => download(slug(S.main.meta.name) + '.project.json', { format: 'switchboard-project', version: 1, chips: LIB.chips, project: S.main }),
+  exportLib: () => download('switchboard-library.json', { format: 'switchboard-library', version: 1, chips: LIB.chips }),
+  wipe: () => dialog('Clear Everything', 'Delete the main circuit and <b>every chip in the library</b> from this browser?<br><br>Export a project bundle first if you want a backup. This cannot be undone.',
+    [{ l: 'Clear everything', pri: true, f: () => { try { localStorage.removeItem(KEY); } catch (e) {} LIB.chips = {}; invalidate(); S.levels = [S.levels[0]]; S.main.meta = newCirc().meta; S.main.components = []; S.main.wires = []; L().undo = []; L().redo = []; S.traces = []; RT.clear(); changed(); renderAll(); fit(); } }, { l: 'Cancel' }]),
+};
+
+/* ---------------- chrome: crumbs, panels, splitters ---------------- */
+function renderCrumbs() {
+  const el = $('#crumbs'); if (!el) return;
+  el.innerHTML = S.levels.map((l, i) => { const nm = esc(l.circ.meta.name || (i ? 'Chip' : 'Untitled')) + (l.edited ? '*' : ''); return i === S.levels.length - 1 ? `<b>${nm}</b>` : `<a data-l="${i}" style="color:#9cc4ff;cursor:default">${nm}</a> &gt;`; }).join(' ');
+  el.querySelectorAll('a').forEach(a => a.onclick = () => closeTo(+a.dataset.l, true));
+  const lv = L(); $('#editbar').classList.toggle('show', !!lv.chipId); $('#ebName').textContent = lv.chipId ? (C().meta.name || 'Chip') + (lv.edited ? ' (modified)' : '') : '';
+}
+function renderAll() { renderCrumbs(); renderToolbar(); renderPalette(); renderInspector(); updUndo(); hint(); }
+function applyLayout() {
+  const u = S.ui, root = document.documentElement.style;
+  root.setProperty('--palW', u.palW + 'px'); root.setProperty('--insW', u.insW + 'px'); root.setProperty('--anH', u.anH + 'px');
+  $('#palette').classList.toggle('hidden', !u.pal); $('#spPal').classList.toggle('hidden', !u.pal);
+  $('#inspector').classList.toggle('hidden', !u.ins); $('#spIns').classList.toggle('hidden', !u.ins);
+  $('#analyzer').classList.toggle('hidden', !u.an); $('#spAn').classList.toggle('hidden', !u.an);
+}
+function togglePanel(k) { S.ui[k] = !S.ui[k]; applyLayout(); persist(); setTimeout(sizeCanvases, 0); }
+function splitter(el, axis, get, set) {
+  el.addEventListener('pointerdown', e => {
+    e.preventDefault(); el.setPointerCapture(e.pointerId); el.classList.add('drag'); const s0 = axis === 'x' ? e.clientX : e.clientY, v0 = get();
+    const mv = ev => { set(v0, (axis === 'x' ? ev.clientX : ev.clientY) - s0); applyLayout(); sizeCanvases(); };
+    const up = () => { el.classList.remove('drag'); el.removeEventListener('pointermove', mv); el.removeEventListener('pointerup', up); persist(); };
+    el.addEventListener('pointermove', mv); el.addEventListener('pointerup', up);
+  });
+}
+splitter($('#spPal'), 'x', () => S.ui.palW, (v, d) => { S.ui.palW = Math.max(140, Math.min(480, v + d)); });
+splitter($('#spIns'), 'x', () => S.ui.insW, (v, d) => { S.ui.insW = Math.max(200, Math.min(560, v - d)); });
+splitter($('#spAn'), 'y', () => S.ui.anH, (v, d) => { S.ui.anH = Math.max(60, Math.min(innerHeight * .6, v - d)); });
+document.querySelectorAll('[data-hide]').forEach(x => x.onclick = () => togglePanel(x.dataset.hide));
+$('#anAdd').onclick = traceSel; $('#anClear').onclick = () => { for (const t of S.traces) t.hist = []; S.anDirty = true; }; $('#anRm').onclick = () => { S.traces = []; sizeCanvases(); S.anDirty = true; };
+$('#ebSave').onclick = () => saveChip(); $('#ebDone').onclick = () => closeTo(S.levels.length - 2, true); $('#ebDiscard').onclick = () => closeTo(S.levels.length - 2, false);
+
+function sizeCanvases() {
+  DPR = Math.max(1, window.devicePixelRatio || 1);
+  const w = $('#wrap'); cv.width = Math.max(1, w.clientWidth * DPR); cv.height = Math.max(1, w.clientHeight * DPR);
+  const ab = $('#anBody'); const aw = ab.clientWidth, ah = Math.max(ab.clientHeight, S.traces.length * ROWH);
+  an.style.height = ah + 'px'; an.width = Math.max(1, aw * DPR); an.height = Math.max(1, ah * DPR);
+  S.dirty = true; S.anDirty = true;
+}
+new ResizeObserver(sizeCanvases).observe($('#wrap'));
+new ResizeObserver(sizeCanvases).observe($('#anBody'));
+
+/* ---------------- main loop + status bar ---------------- */
+let lastT = performance.now(), fN = 0, fT = lastT, fps = 0, tickN = 0, tps = 0;
+function frame(t) {
+  const dt = Math.min(250, t - lastT); lastT = t;
+  if (S.need) { recompile(); renderInspectorLive(true); if (!S.sel.size && !S.selW.size && !(document.activeElement && document.activeElement.closest && document.activeElement.closest('#insBody'))) renderInspector(); }
+  const sim = S.sim;
+  if (sim) {
+    if (sim.qn > 0) sim.settle(Math.min(sim.budget, 60000));
+    if (S.running && sim.clocks.length) {
+      const t0 = performance.now();
+      if (S.turbo) { do { for (let k = 0; k < 8; k++) { sim.edge(); sim.settle(); sample(); tickN++; } } while (performance.now() - t0 < 12); }
+      else { S.acc += dt / 1000 * S.hz * 2; let n = Math.floor(S.acc); S.acc -= n; while (n-- > 0) { sim.edge(); sim.settle(); sample(); tickN++; if (performance.now() - t0 > 12) { S.acc = 0; break; } } }
+    }
+    if (sim.changed) { sim.changed = false; S.dirty = true; renderInspectorLive(); }
+  }
+  if (S.dirty) { S.dirty = false; draw(); }
+  if (S.anDirty) { S.anDirty = false; drawAn(); }
+  fN++;
+  if (t - fT >= 500) { const s = (t - fT) / 1000; fps = fN / s; tps = tickN / s; fN = 0; tickN = 0; fT = t; statusBar(); }
+  requestAnimationFrame(frame);
+}
+function statusBar() {
+  const s = S.sim, c = C(), sh = s ? s.shorts() : 0, fmt = n => n >= 1e6 ? (n / 1e6).toFixed(1) + 'M' : n >= 1e3 ? (n / 1e3).toFixed(1) + 'k' : String(Math.round(n));
+  $('#sbTick').textContent = s ? s.ticks : 0; $('#sbTps').textContent = fmt(tps); $('#sbFps').textContent = Math.round(fps);
+  $('#sbStats').innerHTML = `Parts<span class="v">${c.components.length}</span>&nbsp; Switches<span class="v">${s ? fmt(s.counts.SW || 0) : 0}</span>&nbsp; Nets<span class="v">${s ? fmt(s.N) : 0}</span>`;
+  $('#sbSim').innerHTML = 'Simulation: ' + (s ? (s.unstable ? '<span class="warn">&nbsp;Oscillating</span>' : '<span class="good">&nbsp;Stable</span>') : '<span class="bad">&nbsp;Error</span>') + (sh ? `<span class="bad">&nbsp;| ${sh} short(s)</span>` : '') + (S.running && s && s.clocks.length ? '' : (s && s.clocks.length ? '&nbsp;| Paused' : ''));
+}
+
+/* ---------------- boot ---------------- */
+(function boot() {
+  const had = loadSaved();
+  if (!had) S.main = newCirc({ name: 'Untitled' });
+  S.levels = [{ circ: S.main, undo: [], redo: [], view: null }];
+  renderMenubar(); applyLayout(); sizeCanvases(); renderAll();
+  fit(); if (!had) S.view.z = 1, fit();
+  if (!had && hasOld()) toast('A session from the previous version exists. File > Import session from previous version restores it.');
+  requestAnimationFrame(frame);
+})();
+
+</script>
+</body>
+</html>
