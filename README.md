@@ -12,14 +12,9 @@ The whole app is one HTML file. It has no dependencies, needs no build step and 
 
 ## Getting started
 
-1. Download `switchboard.html`.
-2. Open it in any modern browser (Chrome, Edge, Firefox or Safari).
+Visit switchsim.vercel.app on any modern browser (Chrome, Edge, Firefox, etc.)
 
 That's all. Your circuit and chip library save automatically in your browser's local storage.
-
-### Hosting it on GitHub Pages
-
-Rename `switchboard.html` to `index.html`, push it to a repository, then turn on **Settings → Pages** for that branch.
 
 ---
 
